@@ -1,4 +1,4 @@
-h2. AWS Terrafrom WordPress IaC構築
+* AWS Terrafrom WordPress IaC構築
 
 ## 概要
 
@@ -52,4 +52,3 @@ AWS上にTerraformを用いてWordPressブログ環境をIaCとして構築し�
   - IGWでパブリックサブネットの外部通信を実現
   - NAT Gatewayでプライベートサブネットからのインターネットアクセスを実現
   - ルートテーブルでサブネットごとに通信経路を制御
-  
