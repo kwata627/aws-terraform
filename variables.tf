@@ -37,3 +37,14 @@ variable "az1" {
   type        = string
   default     = "ap-northeast-1a"
 }
+
+variable "db_password" {
+  description = "RDSマスターパスワード"
+  type        = string
+  sensitive   = true
+}
+
+variable "snapshot_date" {
+  description = "スナップショット識別子用の日付 (例: 20250731)"
+  type        = string
+}

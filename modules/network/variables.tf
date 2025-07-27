@@ -4,7 +4,7 @@ variable "project" {
 }
 
 variable "vpc_cidr" {
-  description = "VPCのCIDRブロック"
+	description = "VPCのCIDRブロック"
   type        = string
 }
 

@@ -1,14 +1,19 @@
 output "vpc_id" {
-  description = "作成したVPCのID"
-  value       = module.network.vpc_id
+  description = "このモジュールで作成したVPCのID"
+  value       = aws_vpc.main.id
 }
 
 output "public_subnet_id" {
   description = "パブリックサブネットのID"
-  value       = module.network.public_subnet_id
+  value       = aws_subnet.public_1a.id
 }
 
-output "private_subnet_id" {
-  description = "プライベートサブネットのID"
-  value       = module.network.private_subnet_id
+output "private_subnet_id_1" {
+  description = "プライベートサブネット1aのID"
+  value       = aws_subnet.private_1a.id
+}
+
+output "private_subnet_id_2" {
+  description = "プライベートサブネット1cのID"
+  value       = aws_subnet.private_1c.id
 }
