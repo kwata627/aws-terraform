@@ -48,3 +48,31 @@ variable "snapshot_date" {
   description = "スナップショット識別子用の日付 (例: 20250731)"
   type        = string
 }
+
+variable "ami_id" {
+  description = "EC2インスタンス用のAMI ID（Amazon Linux 2023）"
+  type        = string
+  default     = "ami-0d52744d6551d851e"
+}
+
+variable "instance_type" {
+  description = "EC2インスタンスタイプ"
+  type        = string
+  default     = "t2.micro"
+}
+
+variable "ssh_public_key" {
+  description = "SSH接続用の公開鍵（~/.ssh/id_rsa.pub等の内容）"
+  type        = string
+}
+
+variable "root_volume_size" {
+  description = "ルートボリュームのサイズ（GB）"
+  type        = number
+  default     = 8
+}
+
+variable "domain_name" {
+  description = "管理するドメイン名（例: example.com）"
+  type        = string
+}
