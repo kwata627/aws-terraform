@@ -2,10 +2,10 @@
 
 # --- S3バケットの作成 ---
 resource "aws_s3_bucket" "main" {
-  bucket = "${var.project}-static-files-${random_string.bucket_suffix.result}"
+  bucket = "${var.s3_bucket_name}-${random_string.bucket_suffix.result}"
 
   tags = {
-    Name = "${var.project}-static-files"
+    Name = var.s3_bucket_name
   }
 }
 
@@ -36,6 +36,31 @@ resource "aws_s3_bucket_public_access_block" "main" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+# --- CloudFront OAC用バケットポリシー ---
+resource "aws_s3_bucket_policy" "main" {
+  bucket = aws_s3_bucket.main.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid       = "AllowCloudFrontServicePrincipalReadOnly",
+        Effect    = "Allow",
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        },
+        Action   = "s3:GetObject",
+        Resource = "${aws_s3_bucket.main.arn}/*",
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = var.cloudfront_distribution_arn
+          }
+        }
+      }
+    ]
+  })
+  depends_on = [aws_s3_bucket_public_access_block.main]
 }
 
 # --- ランダム文字列の生成（バケット名の重複回避用） ---

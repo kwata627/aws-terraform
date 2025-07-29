@@ -58,3 +58,8 @@ variable "snapshot_date" {
   description = "スナップショット識別子用の日付 (例: 20250731)"
   type        = string
 }
+
+variable "rds_identifier" {
+  description = "RDSインスタンスの識別子"
+  type        = string
+}

@@ -11,7 +11,7 @@ variable "aws_profile" {
 variable "project" {
   description = "プロジェクト名（リソース名のprefix用）"
   type        = string
-  default     = "wp-demo"
+  # default     = "wp-demo"
 }
 
 variable "vpc_cidr" {
@@ -75,4 +75,22 @@ variable "root_volume_size" {
 variable "domain_name" {
   description = "管理するドメイン名（例: example.com）"
   type        = string
+}
+
+variable "ec2_name" {
+  description = "EC2インスタンスのNameタグ"
+  type        = string
+  # default     = "wp-demo-wordpress"
+}
+
+variable "s3_bucket_name" {
+  description = "S3バケット名（suffixは自動付与）"
+  type        = string
+  # default     = "wp-demo-static-files"
+}
+
+variable "rds_identifier" {
+  description = "RDSインスタンスの識別子"
+  type        = string
+  # default     = "wp-demo-db"
 }

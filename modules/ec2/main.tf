@@ -30,7 +30,7 @@ resource "aws_instance" "wordpress" {
 
   # タグ設定
   tags = {
-    Name = "${var.project}-wordpress"
+    Name = var.ec2_name
   }
 
   # UserDataでWordPress自動インストール

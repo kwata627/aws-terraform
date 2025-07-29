@@ -32,7 +32,7 @@ resource "aws_db_parameter_group" "main" {
 
 # --- RDSインスタンスの作成 ---
 resource "aws_db_instance" "main" {
-  identifier = "${var.project}-db"                  # RDSインスタンスの識別子
+  identifier = var.rds_identifier                  # RDSインスタンスの識別子
 
   # エンジン設定
   engine         = "mysql"
@@ -76,6 +76,6 @@ resource "aws_db_instance" "main" {
   # final_snapshot_identifier = "wp-demo-db-final-${var.snapshot_date}"  # ← 一時的にコメントアウト
 
   tags = {
-    Name = "${var.project}-db"
+    Name = var.rds_identifier
   }
 }

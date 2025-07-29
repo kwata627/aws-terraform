@@ -24,6 +24,7 @@ module "rds" {
   rds_security_group_id = module.security.rds_sg_id
   db_password           = var.db_password
   snapshot_date         = var.snapshot_date
+  rds_identifier        = var.rds_identifier
 }
 
 # EC2モジュール
@@ -35,12 +36,15 @@ module "ec2" {
   subnet_id         = module.network.public_subnet_id
   security_group_id = module.security.ec2_public_sg_id
   ssh_public_key    = var.ssh_public_key
+  ec2_name          = var.ec2_name
 }
 
 # S3モジュール
 module "s3" {
-  source  = "./modules/s3"
-  project = var.project
+  source           = "./modules/s3"
+  project          = var.project
+  s3_bucket_name   = var.s3_bucket_name
+  cloudfront_distribution_arn = module.cloudfront.distribution_arn
 }
 
 # ACMモジュール
