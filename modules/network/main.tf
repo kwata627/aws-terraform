@@ -39,9 +39,9 @@ resource "aws_subnet" "private_1c" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = "10.0.20.0/24"
   availability_zone = "ap-northeast-1c"
-  tags = {
+        tags = {
     Name = "${var.project}-private-1c"
-  }
+        }
 }
 
 # ----- IGWの作成 -----

@@ -36,6 +36,22 @@ variable "root_volume_size" {
   default     = 8
 }
 
+variable "enable_validation_ec2" {
+  description = "検証用EC2インスタンスの作成有無"
+  type        = bool
+  default     = false
+}
+
+variable "private_subnet_id" {
+  description = "検証用EC2インスタンスを配置するプライベートサブネットID"
+  type        = string
+}
+
+variable "validation_ec2_name" {
+  description = "検証用EC2インスタンスのNameタグ"
+  type        = string
+}
+
 variable "ec2_name" {
   description = "EC2インスタンスのNameタグ"
   type        = string

@@ -55,8 +55,20 @@ variable "db_password" {
 }
 
 variable "snapshot_date" {
-  description = "スナップショット識別子用の日付 (例: 20250731)"
+  description = "スナップショット識別子用の日付 (例: 20240727)"
   type        = string
+}
+
+variable "enable_validation_rds" {
+  description = "検証用RDSインスタンスの作成有無"
+  type        = bool
+  default     = false
+}
+
+variable "validation_rds_snapshot_identifier" {
+  description = "検証用RDSのスナップショット識別子（空の場合は新規作成）"
+  type        = string
+  default     = ""
 }
 
 variable "rds_identifier" {

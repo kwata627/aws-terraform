@@ -79,3 +79,59 @@ resource "aws_db_instance" "main" {
     Name = var.rds_identifier
   }
 }
+
+# ----- 検証用RDSインスタンスの作成 -----
+
+# --- 検証用RDSインスタンス ---
+resource "aws_db_instance" "validation" {
+  count = var.enable_validation_rds ? 1 : 0
+
+  identifier = "${var.rds_identifier}-validation"
+
+  # エンジン設定
+  engine         = "mysql"
+  engine_version = "8.0"
+  instance_class = var.db_instance_class
+
+  # ストレージ設定
+  allocated_storage     = var.allocated_storage
+  max_allocated_storage = var.max_allocated_storage
+  storage_type          = "gp2"
+  storage_encrypted      = true
+
+  # データベース設定
+  db_name  = var.db_name
+  username = var.db_username
+  password = var.db_password
+  port     = 3306
+
+  # ネットワーク設定
+  vpc_security_group_ids = [var.rds_security_group_id]
+  db_subnet_group_name   = aws_db_subnet_group.main.name
+
+  # パラメータグループ
+  parameter_group_name = aws_db_parameter_group.main.name
+
+  # バックアップ設定
+  backup_retention_period = 7
+  backup_window          = "03:00-04:00"
+  maintenance_window     = "sun:04:00-sun:05:00"
+
+  # 削除保護（検証用なのでfalse）
+  deletion_protection = false
+
+  # パブリックアクセス無効（プライベートサブネットのため）
+  publicly_accessible = false
+
+  # マルチAZ無効（コスト削減のため）
+  multi_az = false
+
+  # スナップショットからの復元（指定がある場合）
+  snapshot_identifier = var.validation_rds_snapshot_identifier != "" ? var.validation_rds_snapshot_identifier : null
+
+  skip_final_snapshot = true
+
+  tags = {
+    Name = "${var.rds_identifier}-validation"
+  }
+}

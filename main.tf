@@ -15,18 +15,6 @@ module "security" {
   vpc_id   = module.network.vpc_id
 }
 
-# RDSモジュール
-module "rds" {
-  source                = "./modules/rds"
-  project               = var.project
-  private_subnet_id_1   = module.network.private_subnet_id_1
-  private_subnet_id_2   = module.network.private_subnet_id_2
-  rds_security_group_id = module.security.rds_sg_id
-  db_password           = var.db_password
-  snapshot_date         = var.snapshot_date
-  rds_identifier        = var.rds_identifier
-}
-
 # EC2モジュール
 module "ec2" {
   source            = "./modules/ec2"
@@ -34,9 +22,26 @@ module "ec2" {
   ami_id            = var.ami_id
   instance_type     = var.instance_type
   subnet_id         = module.network.public_subnet_id
+  private_subnet_id = module.network.private_subnet_id_1
   security_group_id = module.security.ec2_public_sg_id
   ssh_public_key    = var.ssh_public_key
   ec2_name          = var.ec2_name
+  enable_validation_ec2 = var.enable_validation_ec2
+  validation_ec2_name = var.validation_ec2_name
+}
+
+# RDSモジュール
+module "rds" {
+  source                  = "./modules/rds"
+  project                 = var.project
+  private_subnet_id_1     = module.network.private_subnet_id_1
+  private_subnet_id_2     = module.network.private_subnet_id_2
+  rds_security_group_id   = module.security.rds_sg_id
+  db_password             = var.db_password
+  snapshot_date           = var.snapshot_date
+  rds_identifier          = var.rds_identifier
+  enable_validation_rds   = var.enable_validation_rds
+  validation_rds_snapshot_identifier = var.validation_rds_snapshot_identifier
 }
 
 # S3モジュール
