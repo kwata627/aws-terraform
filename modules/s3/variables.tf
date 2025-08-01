@@ -17,6 +17,7 @@ variable "s3_bucket_name" {
 variable "cloudfront_distribution_arn" {
   description = "CloudFrontディストリビューションのARN（S3バケットポリシー用）"
   type        = string
+  default     = ""
 }
 
 variable "rds_identifier" {

@@ -20,6 +20,8 @@ resource "aws_route53_record" "wordpress" {
 
 # --- CNAMEレコードの作成（CloudFront用） ---
 resource "aws_route53_record" "cloudfront" {
+  count = var.cloudfront_domain_name != "" ? 1 : 0 # 空文字でない場合のみ作成
+
   zone_id = aws_route53_zone.main.zone_id
   name    = "static.${var.domain_name}"
   type    = "CNAME"
