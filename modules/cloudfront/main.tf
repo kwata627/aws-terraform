@@ -2,7 +2,7 @@
 
 # --- CloudFrontディストリビューション ---
 resource "aws_cloudfront_distribution" "main" {
-  enabled             = true
+  enabled             = false # 一時的に無効化
   is_ipv6_enabled    = true
   default_root_object = "index.html"
 

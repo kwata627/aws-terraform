@@ -40,6 +40,8 @@ resource "aws_s3_bucket_public_access_block" "main" {
 
 # --- CloudFront OAC用バケットポリシー ---
 resource "aws_s3_bucket_policy" "main" {
+  count = var.cloudfront_distribution_arn != "" ? 1 : 0 # 空文字でない場合のみ作成
+
   bucket = aws_s3_bucket.main.id
   policy = jsonencode({
     Version = "2012-10-17",

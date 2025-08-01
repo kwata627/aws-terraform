@@ -25,8 +25,8 @@ variable "security_group_id" {
   type        = string
 }
 
-variable "ssh_public_key" {
-  description = "SSH接続用の公開鍵（~/.ssh/id_rsa.pub等の内容）"
+variable "key_name" {
+  description = "統一されたSSHキーペア名"
   type        = string
 }
 
@@ -49,6 +49,16 @@ variable "private_subnet_id" {
 
 variable "validation_ec2_name" {
   description = "検証用EC2インスタンスのNameタグ"
+  type        = string
+}
+
+variable "ssh_public_key" {
+  description = "SSH公開鍵の内容"
+  type        = string
+}
+
+variable "validation_security_group_id" {
+  description = "検証用EC2インスタンス用のセキュリティグループID"
   type        = string
 }
 

@@ -16,6 +16,7 @@ variable "wordpress_ip" {
 variable "cloudfront_domain_name" {
   description = "CloudFrontディストリビューションのドメイン名"
   type        = string
+  default     = ""
 }
 
 variable "certificate_validation_records" {

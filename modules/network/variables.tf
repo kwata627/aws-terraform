@@ -22,3 +22,8 @@ variable "az1" {
   description = "利用するアベイラビリティゾーン"
   type        = string
 }
+
+variable "nat_instance_network_interface_id" {
+  description = "プライベートルート用NATインスタンスのネットワークインターフェースID（main.tfから渡す）"
+  type        = string
+}

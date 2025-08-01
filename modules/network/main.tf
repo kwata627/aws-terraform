@@ -76,47 +76,31 @@ resource "aws_route_table_association" "public_1a" {
   route_table_id = aws_route_table.public.id
 }
 
-# ----- Elastic IPの確保（NAT用） -----
-
-resource "aws_eip" "nat_eip" {
-  domain = "vpc"
-	
-	tags = {
-    Name = "${var.project}-nat-eip"
-	}
-}
-
-# ----- NAT Gatewayの作成 -----
-
-resource "aws_nat_gateway" "nat" {
-  allocation_id = aws_eip.nat_eip.id                  # EIPを割当
-  subnet_id     = aws_subnet.public_1a.id             # パブリックサブネットに配置
-
-        tags = {
-    Name = "${var.project}-natgw"
-        }
-
-  depends_on = [aws_internet_gateway.igw]             # IGW作成後にNAT作成
-}
-
 # ----- ルートテーブル(プライベート)の定義 -----
 
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
-        route {
+  route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat.id           # NAT Gateway経由で外部アクセス
-        }
+    # NAT Gatewayの代わりにNATインスタンスを指定
+    network_interface_id = var.nat_instance_network_interface_id # main.tfから渡す
+  }
 
-        tags = {
+  tags = {
     Name = "${var.project}-rt-private"
-        }
+  }
 }
 
 # ----- サブネットとルートテーブルの関連付け（プライベート） -----
 
 resource "aws_route_table_association" "private_1a" {
   subnet_id      = aws_subnet.private_1a.id
+  route_table_id = aws_route_table.private.id
+}
+
+# プライベートサブネット1cのルートテーブル関連付けを追加
+resource "aws_route_table_association" "private_1c" {
+  subnet_id      = aws_subnet.private_1c.id
   route_table_id = aws_route_table.private.id
 }

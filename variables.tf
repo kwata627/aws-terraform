@@ -11,27 +11,31 @@ variable "aws_profile" {
 variable "project" {
   description = "プロジェクト名（リソース名のprefix用）"
   type        = string
+  default     = "wp-shamo"
 }
 
 variable "ec2_name" {
   description = "EC2インスタンスのNameタグ"
   type        = string
+  default     = "wp-shamo-ec2"
 }
 
 variable "validation_ec2_name" {
   description = "検証用EC2インスタンスのNameタグ"
   type        = string
-  
+  default     = "wp-test-ec2"
 }
 
 variable "rds_identifier" {
   description = "RDSインスタンスの識別子"
   type        = string
+  default     = "wp-shamo-rds"
 }
 
 variable "s3_bucket_name" {
   description = "S3バケット名（suffixは自動付与）"
   type        = string
+  default     = "wp-shamo-s3"
 }
 
 variable "snapshot_date" {
@@ -42,7 +46,6 @@ variable "snapshot_date" {
 variable "ssh_public_key" {
   description = "SSH接続用の公開鍵（~/.ssh/id_rsa.pub等の内容）"
   type        = string
-  default     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTDkAR+x5PSHxOUKxhjANftVm67xYi2J3TNf8IfFhc7 wata2watter0903@gmail.com"
 }
 
 variable "vpc_cidr" {
@@ -73,6 +76,7 @@ variable "db_password" {
   description = "RDSマスターパスワード"
   type        = string
   sensitive   = true
+  default     = "breadhouse"
 }
 
 variable "ami_id" {
@@ -101,7 +105,7 @@ variable "domain_name" {
 variable "enable_validation_ec2" {
   description = "検証用EC2インスタンスの作成有無"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "enable_validation_rds" {
