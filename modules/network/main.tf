@@ -81,15 +81,18 @@ resource "aws_route_table_association" "public_1a" {
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    # NAT Gatewayの代わりにNATインスタンスを指定
-    network_interface_id = var.nat_instance_network_interface_id # main.tfから渡す
-  }
-
   tags = {
     Name = "${var.project}-rt-private"
   }
+}
+
+# ----- NATインスタンス用のルート追加（後から設定） -----
+resource "aws_route" "private_nat" {
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "0.0.0.0/0"
+  network_interface_id   = var.nat_instance_network_interface_id
+
+  depends_on = []
 }
 
 # ----- サブネットとルートテーブルの関連付け（プライベート） -----

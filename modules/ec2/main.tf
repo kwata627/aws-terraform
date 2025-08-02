@@ -23,41 +23,63 @@ resource "aws_instance" "wordpress" {
     Name = var.ec2_name
   }
 
-  # UserDataでWordPress自動インストール
+  # UserDataで最小限の初期設定のみ（デバッグログ付き）
   user_data = base64encode(<<-EOF
               #!/bin/bash
               
-              # SSH設定の初期化（Amazon Linux 2023対応）
+              # デバッグログの開始
+              exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+              echo "=== UserData開始: $(date) ==="
+              
+              # システムアップデート
+              echo "システムアップデート開始..."
+              yum update -y
+              echo "システムアップデート完了"
+              
+              # SSHサービスの有効化
+              echo "SSHサービス設定開始..."
               systemctl enable sshd
               systemctl start sshd
+              echo "SSHサービス状態: $(systemctl is-active sshd)"
               
-              # SSH公開鍵の配置
+              # SSH設定ファイルの確認
+              echo "SSH設定ファイル確認..."
+              if [ -f /etc/ssh/sshd_config ]; then
+                echo "SSH設定ファイル存在: /etc/ssh/sshd_config"
+                grep -E "^(PubkeyAuthentication|AuthorizedKeysFile|PasswordAuthentication)" /etc/ssh/sshd_config || echo "設定項目が見つかりません"
+              else
+                echo "SSH設定ファイルが存在しません"
+              fi
+              
+              # 基本的なSSH設定（Ansibleで詳細設定）
+              echo "SSH公開鍵設定開始..."
               mkdir -p /home/ec2-user/.ssh
+              echo "SSHディレクトリ作成完了: /home/ec2-user/.ssh"
+              
               echo "${var.ssh_public_key}" > /home/ec2-user/.ssh/authorized_keys
+              echo "SSH公開鍵設定完了"
+              
               chmod 700 /home/ec2-user/.ssh
               chmod 600 /home/ec2-user/.ssh/authorized_keys
               chown -R ec2-user:ec2-user /home/ec2-user/.ssh
+              echo "SSH権限設定完了"
               
-              yum update -y
-              yum install -y httpd php php-mysqlnd php-gd php-mbstring php-xml php-curl mysql
+              # SSH設定の確認
+              echo "SSH設定確認..."
+              ls -la /home/ec2-user/.ssh/
+              echo "authorized_keys内容確認:"
+              cat /home/ec2-user/.ssh/authorized_keys
               
-              # Apache起動・自動起動設定
-              systemctl start httpd
-              systemctl enable httpd
+              # SSHサービス再起動
+              echo "SSHサービス再起動..."
+              systemctl restart sshd
+              echo "SSHサービス再起動完了"
               
-              # WordPressダウンロード・設定
-              cd /var/www/html
-              wget https://wordpress.org/latest.tar.gz
-              tar -xzf latest.tar.gz
-              cp -r wordpress/* .
-              rm -rf wordpress latest.tar.gz
+              # SSH設定テスト
+              echo "SSH設定テスト..."
+              /usr/sbin/sshd -t && echo "SSH設定テスト成功" || echo "SSH設定テスト失敗"
               
-              # 権限設定
-              chown -R apache:apache /var/www/html
-              chmod -R 755 /var/www/html
-              
-              # wp-config.phpの設定（後で手動でDB接続情報を設定）
-              cp wp-config-sample.php wp-config.php
+              echo "=== UserData完了: $(date) ==="
               EOF
   )
 
@@ -83,7 +105,7 @@ resource "aws_instance" "validation" {
 
   ami           = var.ami_id
   instance_type = var.instance_type
-  # key_name      = var.key_name  # AWSキーペアを無効化
+  key_name      = var.key_name  # 統一されたキーペアを使用
 
   # ネットワーク設定（プライベートサブネットに配置）
   subnet_id                   = var.private_subnet_id
@@ -105,45 +127,65 @@ resource "aws_instance" "validation" {
     Name = var.validation_ec2_name
   }
 
-  # UserDataでWordPress自動インストール（本番と同じ）
-  user_data = <<-EOF
+  # UserDataで最小限の初期設定のみ（デバッグログ付き）
+  user_data = base64encode(<<-EOF
               #!/bin/bash
-              # SSH設定の初期化（Amazon Linux 2023対応）
+              
+              # デバッグログの開始
+              exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+              echo "=== 検証用EC2 UserData開始: $(date) ==="
+              
+              # システムアップデート
+              echo "システムアップデート開始..."
+              yum update -y
+              echo "システムアップデート完了"
+              
+              # SSHサービスの有効化
+              echo "SSH設定開始..."
               systemctl enable sshd
               systemctl start sshd
+              echo "SSHサービス状態: $(systemctl is-active sshd)"
               
-              # または、より確実な方法
-              /usr/sbin/sshd -t
-              systemctl status sshd
+              # SSH設定ファイルの確認
+              echo "SSH設定ファイル確認..."
+              if [ -f /etc/ssh/sshd_config ]; then
+                echo "SSH設定ファイル存在: /etc/ssh/sshd_config"
+                grep -E "^(PubkeyAuthentication|AuthorizedKeysFile|PasswordAuthentication)" /etc/ssh/sshd_config || echo "設定項目が見つかりません"
+              else
+                echo "SSH設定ファイルが存在しません"
+              fi
               
-              # SSH公開鍵の配置
+              # 基本的なSSH設定（Ansibleで詳細設定）
+              echo "SSH公開鍵設定開始..."
               mkdir -p /home/ec2-user/.ssh
+              echo "SSHディレクトリ作成完了: /home/ec2-user/.ssh"
+              
               echo "${var.ssh_public_key}" > /home/ec2-user/.ssh/authorized_keys
+              echo "SSH公開鍵設定完了"
+              
               chmod 700 /home/ec2-user/.ssh
               chmod 600 /home/ec2-user/.ssh/authorized_keys
               chown -R ec2-user:ec2-user /home/ec2-user/.ssh
+              echo "SSH権限設定完了"
               
-              yum update -y
-              yum install -y httpd php php-mysqlnd php-gd php-mbstring php-xml php-curl mysql
+              # SSH設定の確認
+              echo "SSH設定確認..."
+              ls -la /home/ec2-user/.ssh/
+              echo "authorized_keys内容確認:"
+              cat /home/ec2-user/.ssh/authorized_keys
               
-              # Apache起動・自動起動設定
-              systemctl start httpd
-              systemctl enable httpd
+              # SSHサービス再起動
+              echo "SSHサービス再起動..."
+              systemctl restart sshd
+              echo "SSHサービス再起動完了"
               
-              # WordPressダウンロード・設定
-              cd /var/www/html
-              wget https://wordpress.org/latest.tar.gz
-              tar -xzf latest.tar.gz
-              cp -r wordpress/* .
-              rm -rf wordpress latest.tar.gz
+              # SSH設定テスト
+              echo "SSH設定テスト..."
+              /usr/sbin/sshd -t && echo "SSH設定テスト成功" || echo "SSH設定テスト失敗"
               
-              # 権限設定
-              chown -R apache:apache /var/www/html
-              chmod -R 755 /var/www/html
-              
-              # wp-config.phpの設定（後で手動でDB接続情報を設定）
-              cp wp-config-sample.php wp-config.php
+              echo "=== 検証用EC2 UserData完了: $(date) ==="
               EOF
+  )
 
   depends_on = []
 }

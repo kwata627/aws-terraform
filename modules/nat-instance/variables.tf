@@ -14,7 +14,7 @@ variable "security_group_id" {
 }
 
 variable "ami_id" {
-  description = "NATインスタンス用AMI ID（Amazon Linux 2など）"
+  description = "NATインスタンス用AMI ID（Amazon Linux 2023）"
   type        = string
 }
 
@@ -32,4 +32,10 @@ variable "key_name" {
 variable "ssh_public_key" {
   description = "SSH公開鍵の内容"
   type        = string
+}
+
+variable "ssh_private_key" {
+  description = "SSH秘密鍵の内容（検証用インスタンス接続用）"
+  type        = string
+  sensitive   = true
 } 

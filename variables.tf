@@ -43,10 +43,7 @@ variable "snapshot_date" {
   type        = string
 }
 
-variable "ssh_public_key" {
-  description = "SSH接続用の公開鍵（~/.ssh/id_rsa.pub等の内容）"
-  type        = string
-}
+# SSH公開鍵の変数は削除（RSA鍵を自動生成するため）
 
 variable "vpc_cidr" {
   description = "VPCのCIDRブロック"
@@ -82,7 +79,7 @@ variable "db_password" {
 variable "ami_id" {
   description = "EC2インスタンス用のAMI ID（Amazon Linux 2023）"
   type        = string
-  default     = "ami-0d52744d6551d851e"
+  default     = "ami-095af7cb7ddb447ef"
 }
 
 variable "instance_type" {

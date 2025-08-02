@@ -6,7 +6,7 @@ variable "project" {
 variable "ami_id" {
   description = "EC2インスタンス用のAMI ID（Amazon Linux 2023推奨）"
   type        = string
-  default     = "ami-0d52744d6551d851e"  # Amazon Linux 2023 (ap-northeast-1)
+  default     = "ami-095af7cb7ddb447ef"  # Amazon Linux 2023 (ap-northeast-1)
 }
 
 variable "instance_type" {

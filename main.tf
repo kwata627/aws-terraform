@@ -1,8 +1,7 @@
 # SSHモジュール（統一されたキーペア管理）
 module "ssh" {
-  source         = "./modules/ssh"
-  project        = var.project
-  ssh_public_key = var.ssh_public_key
+  source  = "./modules/ssh"
+  project = var.project
 }
 
 # NATインスタンスモジュール
@@ -14,7 +13,8 @@ module "nat_instance" {
   ami_id            = var.ami_id
   instance_type     = "t3.nano"
   key_name          = module.ssh.key_name
-  ssh_public_key    = var.ssh_public_key  # SSH公開鍵を追加
+  ssh_public_key    = module.ssh.public_key_openssh  # 生成されたRSA公開鍵を使用
+  ssh_private_key   = module.ssh.private_key_pem     # 生成されたRSA秘密鍵を使用
 }
 
 # ネットワークモジュール
@@ -25,7 +25,7 @@ module "network" {
   public_subnet_cidr   = var.public_subnet_cidr
   private_subnet_cidr  = var.private_subnet_cidr
   az1                  = var.az1
-  nat_instance_network_interface_id = module.nat_instance.nat_instance_network_interface_id # 修正
+  nat_instance_network_interface_id = module.nat_instance.nat_instance_network_interface_id
 }
 
 # セキュリティグループモジュール
@@ -46,7 +46,7 @@ module "ec2" {
   security_group_id = module.security.ec2_public_sg_id
   validation_security_group_id = module.security.ec2_private_sg_id  # 検証用SGを追加
   key_name          = module.ssh.key_name
-  ssh_public_key    = var.ssh_public_key  # SSH公開鍵を追加
+  ssh_public_key    = module.ssh.public_key_openssh  # 生成されたRSA公開鍵を使用
   ec2_name          = var.ec2_name
   enable_validation_ec2 = var.enable_validation_ec2
   validation_ec2_name = var.validation_ec2_name

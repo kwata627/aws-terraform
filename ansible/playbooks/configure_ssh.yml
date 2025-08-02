@@ -1,0 +1,7 @@
+---
+# SSH設定プレイブック
+- name: Configure SSH on all servers
+  hosts: all
+  become: yes
+  roles:
+    - ssh 

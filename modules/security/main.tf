@@ -86,10 +86,10 @@ resource "aws_security_group" "rds" {
 # --- NATインスタンス用セキュリティグループ（パブリックサブネット用） ---
 resource "aws_security_group" "nat_instance" {
   name        = "${var.project}-sg-nat-instance"
-  description = "NAT instance SG" # ASCIIのみ
+  description = "NAT instance SG"
   vpc_id      = var.vpc_id
 
-  # SSH接続（22番ポート）
+  # SSH接続（22番ポート）- 管理用
   ingress {
     description = "SSH"
     from_port   = 22
@@ -98,7 +98,7 @@ resource "aws_security_group" "nat_instance" {
     cidr_blocks = ["0.0.0.0/0"] # 必要に応じて制限
   }
 
-  # ICMP（ping用）
+  # ICMP（ping用）- 疎通確認用
   ingress {
     description = "ICMP"
     from_port   = -1
@@ -107,25 +107,7 @@ resource "aws_security_group" "nat_instance" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # HTTP（80番）
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # HTTPS（443番）
-  ingress {
-    description = "HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # アウトバウンド通信（全て許可）
+  # アウトバウンド通信（全て許可）- NATインスタンスの主要機能
   egress {
     from_port   = 0
     to_port     = 0

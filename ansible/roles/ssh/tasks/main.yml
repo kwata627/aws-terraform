@@ -1,0 +1,45 @@
+---
+# SSH設定タスク
+- name: Ensure SSH service is enabled and running
+  service:
+    name: sshd
+    state: started
+    enabled: yes
+
+- name: Create .ssh directory for ec2-user
+  file:
+    path: /home/ec2-user/.ssh
+    state: directory
+    mode: '0700'
+    owner: ec2-user
+    group: ec2-user
+
+- name: Set authorized_keys for ec2-user
+  authorized_key:
+    user: ec2-user
+    state: present
+    key: "{{ ssh_public_key }}"
+    manage_dir: no
+
+- name: Ensure correct permissions on authorized_keys
+  file:
+    path: /home/ec2-user/.ssh/authorized_keys
+    mode: '0600'
+    owner: ec2-user
+    group: ec2-user
+
+- name: Configure SSH daemon settings
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+    - { regexp: '^#?AuthorizedKeysFile', line: 'AuthorizedKeysFile .ssh/authorized_keys' }
+    - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+  notify: restart sshd
+
+- name: Test SSH configuration
+  command: sshd -t
+  changed_when: false 
