@@ -51,6 +51,14 @@ resource "aws_instance" "wordpress" {
               chown -R ec2-user:ec2-user /home/ec2-user/.ssh
               echo "SSH設定完了"
               
+              # Apacheのデフォルトファイルを削除（WordPress用）
+              echo "Apacheデフォルトファイル削除開始..."
+              if [ -f /var/www/html/index.html ]; then
+                rm -f /var/www/html/index.html
+                echo "Apacheデフォルトindex.htmlを削除しました"
+              fi
+              echo "Apacheデフォルトファイル削除完了"
+              
               # Ansible実行の準備
               echo "Ansible実行準備..."
               yum install -y python3
@@ -160,6 +168,14 @@ resource "aws_instance" "validation" {
               # SSH設定テスト
               echo "SSH設定テスト..."
               /usr/sbin/sshd -t && echo "SSH設定テスト成功" || echo "SSH設定テスト失敗"
+              
+              # Apacheのデフォルトファイルを削除（WordPress用）
+              echo "Apacheデフォルトファイル削除開始..."
+              if [ -f /var/www/html/index.html ]; then
+                rm -f /var/www/html/index.html
+                echo "Apacheデフォルトindex.htmlを削除しました"
+              fi
+              echo "Apacheデフォルトファイル削除完了"
               
               echo "=== 検証用EC2 UserData完了: $(date) ==="
               EOF
