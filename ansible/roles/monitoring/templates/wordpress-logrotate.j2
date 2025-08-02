@@ -1,0 +1,25 @@
+/var/log/wordpress/*.log {
+    daily
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    create 644 apache apache
+    postrotate
+        systemctl reload httpd > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/httpd/wordpress_*.log {
+    daily
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    create 644 apache apache
+    postrotate
+        systemctl reload httpd > /dev/null 2>&1 || true
+    endscript
+} 

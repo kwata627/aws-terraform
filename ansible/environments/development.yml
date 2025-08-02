@@ -1,0 +1,25 @@
+---
+# 開発環境設定
+environment: development
+debug_mode: true
+
+# データベース設定
+wordpress_db_host: localhost
+wordpress_db_name: wordpress_dev
+wordpress_db_user: wordpress_dev
+wordpress_db_password: dev_password
+
+# セキュリティ設定
+wordpress_debug: true
+wordpress_automatic_updater_disabled: false
+wordpress_disallow_file_edit: false
+wordpress_disallow_file_mods: false
+
+# 監視設定
+monitoring_enabled: false
+alert_email: dev@example.com
+monitoring_interval_hours: 24
+
+# ログ設定
+log_level: debug
+log_retention_days: 7 

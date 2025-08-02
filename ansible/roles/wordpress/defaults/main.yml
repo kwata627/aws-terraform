@@ -1,0 +1,38 @@
+---
+# WordPressロールのデフォルト変数
+wordpress_version: latest
+wordpress_document_root: /var/www/html
+
+# データベース設定
+wordpress_db_name: wordpress
+wordpress_db_user: wordpress
+wordpress_db_password: password
+wordpress_db_host: localhost
+wordpress_db_charset: utf8
+wordpress_db_collate: ''
+
+# テーブルプレフィックス
+wordpress_table_prefix: wp_
+
+# セキュリティキー（本番環境では変更必須）
+wordpress_auth_key: 'put your unique phrase here'
+wordpress_secure_auth_key: 'put your unique phrase here'
+wordpress_logged_in_key: 'put your unique phrase here'
+wordpress_nonce_key: 'put your unique phrase here'
+wordpress_auth_salt: 'put your unique phrase here'
+wordpress_secure_auth_salt: 'put your unique phrase here'
+wordpress_logged_in_salt: 'put your unique phrase here'
+wordpress_nonce_salt: 'put your unique phrase here'
+
+# デバッグ設定
+wordpress_debug: false
+wordpress_debug_log: false
+wordpress_debug_display: false
+
+# セキュリティ設定
+wordpress_automatic_updater_disabled: true
+wordpress_disallow_file_edit: true
+wordpress_disallow_file_mods: true
+
+# 自動設定
+wordpress_config_auto: false 

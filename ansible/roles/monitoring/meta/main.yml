@@ -1,0 +1,4 @@
+---
+dependencies:
+  - role: wordpress
+    when: wordpress_installation | default(true) 

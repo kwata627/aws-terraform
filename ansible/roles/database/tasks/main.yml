@@ -1,0 +1,43 @@
+---
+# データベース接続設定タスク
+- name: Install MySQL client
+  dnf:
+    name: mysql
+    state: present
+  become: yes
+  ignore_errors: yes
+
+- name: Install MySQL client (alternative package name)
+  dnf:
+    name: mysql-community-client
+    state: present
+  become: yes
+  when: ansible_failed is defined and ansible_failed
+
+- name: Create MySQL configuration directory
+  file:
+    path: /etc/mysql
+    state: directory
+    mode: '0755'
+  become: yes
+
+- name: Configure MySQL client
+  template:
+    src: mysql.conf.j2
+    dest: /etc/mysql/mysql.conf
+    mode: '0644'
+  become: yes
+
+- name: Test database connection
+  mysql_query:
+    login_db: "{{ wordpress_db_name }}"
+    login_host: "{{ wordpress_db_host }}"
+    login_user: "{{ wordpress_db_user }}"
+    login_password: "{{ wordpress_db_password }}"
+    query: "SELECT 1"
+  register: db_test
+  ignore_errors: yes
+
+- name: Display database connection status
+  debug:
+    msg: "Database connection: {{ 'SUCCESS' if db_test is success else 'FAILED' }}" 

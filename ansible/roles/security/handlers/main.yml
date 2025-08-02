@@ -1,0 +1,19 @@
+---
+# セキュリティハンドラー
+- name: restart fail2ban
+  service:
+    name: fail2ban
+    state: restarted
+  become: yes
+
+- name: restart sshd
+  service:
+    name: sshd
+    state: restarted
+  become: yes
+
+- name: reload firewalld
+  service:
+    name: firewalld
+    state: reloaded
+  become: yes 

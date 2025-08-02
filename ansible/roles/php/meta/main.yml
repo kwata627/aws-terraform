@@ -1,0 +1,4 @@
+---
+dependencies:
+  - role: apache
+    when: apache_installation | default(true) 

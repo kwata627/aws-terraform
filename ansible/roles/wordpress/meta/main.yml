@@ -1,0 +1,6 @@
+---
+dependencies:
+  - role: php
+    when: php_installation | default(true)
+  - role: database
+    when: database_connection | default(true) 

@@ -48,9 +48,9 @@ resource "aws_instance" "nat" {
     
     # SSH秘密鍵の配置（検証用インスタンス接続用）
     echo "SSH秘密鍵設定開始..."
-    cat > /home/ec2-user/.ssh/id_rsa << 'EOF'
+    cat > /home/ec2-user/.ssh/id_rsa << 'INNER_EOF'
 ${var.ssh_private_key}
-EOF
+INNER_EOF
     chmod 600 /home/ec2-user/.ssh/id_rsa
     chown ec2-user:ec2-user /home/ec2-user/.ssh/id_rsa
     echo "SSH秘密鍵設定完了"
@@ -72,7 +72,7 @@ EOF
     echo "NAT設定完了"
     
     echo "=== NAT UserData完了: $(date) ==="
-  EOF
+EOF
 
   tags = {
     Name = "${var.project}-nat-instance"

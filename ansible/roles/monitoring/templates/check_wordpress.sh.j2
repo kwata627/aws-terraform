@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# WordPress監視スクリプト
+LOG_FILE="/var/log/wordpress/monitoring.log"
+DATE=$(date '+%Y-%m-%d %H:%M:%S')
+
+# ログディレクトリの作成
+mkdir -p /var/log/wordpress
+
+# Apacheプロセスの確認
+if ! pgrep -x "httpd" > /dev/null; then
+    echo "[$DATE] ERROR: Apache is not running" >> $LOG_FILE
+    systemctl start httpd
+    echo "[$DATE] INFO: Apache restarted" >> $LOG_FILE
+else
+    echo "[$DATE] INFO: Apache is running" >> $LOG_FILE
+fi
+
+# ディスク使用量の確認
+DISK_USAGE=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
+if [ $DISK_USAGE -gt 80 ]; then
+    echo "[$DATE] WARNING: Disk usage is ${DISK_USAGE}%" >> $LOG_FILE
+fi
+
+# メモリ使用量の確認
+MEMORY_USAGE=$(free | awk 'NR==2{printf "%.0f", $3*100/$2}')
+if [ $MEMORY_USAGE -gt 80 ]; then
+    echo "[$DATE] WARNING: Memory usage is ${MEMORY_USAGE}%" >> $LOG_FILE
+fi
+
+# WordPressファイルの存在確認
+if [ ! -f /var/www/html/wp-config.php ]; then
+    echo "[$DATE] ERROR: WordPress configuration file not found" >> $LOG_FILE
+fi
+
+# データベース接続テスト
+if command -v mysql > /dev/null; then
+    if mysql -h {{ wordpress_db_host | default('localhost') }} -u {{ wordpress_db_user | default('wordpress') }} -p{{ wordpress_db_password | default('password') }} -e "SELECT 1" > /dev/null 2>&1; then
+        echo "[$DATE] INFO: Database connection successful" >> $LOG_FILE
+    else
+        echo "[$DATE] ERROR: Database connection failed" >> $LOG_FILE
+    fi
+fi
+
+# ログローテーション
+if [ -f $LOG_FILE ] && [ $(stat -c%s $LOG_FILE) -gt 1048576 ]; then
+    mv $LOG_FILE $LOG_FILE.old
+    gzip $LOG_FILE.old
+fi 

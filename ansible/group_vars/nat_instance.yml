@@ -1,0 +1,25 @@
+---
+# NATインスタンス用変数
+nat_instance_role: nat_gateway
+
+# システム設定
+system_packages:
+  - iptables
+  - iptables-services
+  - net-tools
+
+# ネットワーク設定
+nat_enabled: true
+forwarding_enabled: true
+
+# セキュリティ設定
+firewall_rules:
+  - port: 22
+    protocol: tcp
+    state: enabled
+  - port: 80
+    protocol: tcp
+    state: enabled
+  - port: 443
+    protocol: tcp
+    state: enabled 

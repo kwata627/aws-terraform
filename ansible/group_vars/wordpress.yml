@@ -1,0 +1,33 @@
+---
+# WordPressサーバー用変数
+wordpress_domain: "{{ ansible_default_ipv4.address }}"
+
+# データベース設定
+wordpress_db_host: "{{ rds_endpoint | default('localhost') }}"
+wordpress_db_name: "{{ wordpress_db_name | default('wordpress') }}"
+wordpress_db_user: "{{ wordpress_db_user | default('wordpress') }}"
+wordpress_db_password: "{{ db_password | default('password') }}"
+wordpress_db_charset: utf8mb4
+
+# Apache設定
+wordpress_document_root: /var/www/html
+apache_user: apache
+apache_group: apache
+
+# PHP設定
+php_memory_limit: 256M
+php_max_execution_time: 300
+php_upload_max_filesize: 64M
+php_post_max_size: 64M
+php_date_timezone: Asia/Tokyo
+
+# セキュリティ設定
+wordpress_debug: false
+wordpress_automatic_updater_disabled: true
+wordpress_disallow_file_edit: true
+wordpress_disallow_file_mods: true
+
+# 監視設定
+monitoring_interval_hours: 6
+disk_usage_threshold: 80
+memory_usage_threshold: 80 

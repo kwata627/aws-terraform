@@ -23,7 +23,7 @@ resource "aws_instance" "wordpress" {
     Name = var.ec2_name
   }
 
-  # UserDataで最小限の初期設定のみ（デバッグログ付き）
+  # UserDataで最小限の初期設定のみ（Ansible移行用）
   user_data = base64encode(<<-EOF
               #!/bin/bash
               
@@ -42,44 +42,22 @@ resource "aws_instance" "wordpress" {
               systemctl start sshd
               echo "SSHサービス状態: $(systemctl is-active sshd)"
               
-              # SSH設定ファイルの確認
-              echo "SSH設定ファイル確認..."
-              if [ -f /etc/ssh/sshd_config ]; then
-                echo "SSH設定ファイル存在: /etc/ssh/sshd_config"
-                grep -E "^(PubkeyAuthentication|AuthorizedKeysFile|PasswordAuthentication)" /etc/ssh/sshd_config || echo "設定項目が見つかりません"
-              else
-                echo "SSH設定ファイルが存在しません"
-              fi
-              
-              # 基本的なSSH設定（Ansibleで詳細設定）
+              # SSH公開鍵設定（Ansibleで詳細設定）
               echo "SSH公開鍵設定開始..."
               mkdir -p /home/ec2-user/.ssh
-              echo "SSHディレクトリ作成完了: /home/ec2-user/.ssh"
-              
               echo "${var.ssh_public_key}" > /home/ec2-user/.ssh/authorized_keys
-              echo "SSH公開鍵設定完了"
-              
               chmod 700 /home/ec2-user/.ssh
               chmod 600 /home/ec2-user/.ssh/authorized_keys
               chown -R ec2-user:ec2-user /home/ec2-user/.ssh
-              echo "SSH権限設定完了"
+              echo "SSH設定完了"
               
-              # SSH設定の確認
-              echo "SSH設定確認..."
-              ls -la /home/ec2-user/.ssh/
-              echo "authorized_keys内容確認:"
-              cat /home/ec2-user/.ssh/authorized_keys
-              
-              # SSHサービス再起動
-              echo "SSHサービス再起動..."
-              systemctl restart sshd
-              echo "SSHサービス再起動完了"
-              
-              # SSH設定テスト
-              echo "SSH設定テスト..."
-              /usr/sbin/sshd -t && echo "SSH設定テスト成功" || echo "SSH設定テスト失敗"
+              # Ansible実行の準備
+              echo "Ansible実行準備..."
+              yum install -y python3
+              echo "Python3インストール完了"
               
               echo "=== UserData完了: $(date) ==="
+              echo "Ansibleによる詳細設定を実行してください"
               EOF
   )
 

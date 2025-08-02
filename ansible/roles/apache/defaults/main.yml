@@ -1,0 +1,12 @@
+---
+# Apacheロールのデフォルト変数
+wordpress_domain: localhost
+apache_user: apache
+apache_group: apache
+document_root: /var/www/html
+
+# Apache設定
+apache_modules:
+  - rewrite
+  - headers
+  - ssl 

@@ -1,0 +1,54 @@
+---
+# Apache Webサーバー設定タスク
+- name: Install Apache HTTP Server
+  dnf:
+    name: httpd
+    state: present
+  become: yes
+
+- name: Create Apache configuration directory
+  file:
+    path: /etc/httpd/conf.d
+    state: directory
+    mode: '0755'
+  become: yes
+
+- name: Configure Apache virtual host
+  template:
+    src: wordpress.conf.j2
+    dest: /etc/httpd/conf.d/wordpress.conf
+    mode: '0644'
+  become: yes
+  notify: restart apache
+
+- name: Create document root directory
+  file:
+    path: /var/www/html
+    state: directory
+    mode: '0755'
+    owner: apache
+    group: apache
+  become: yes
+
+- name: Create index.html for testing
+  copy:
+    content: "<html><body><h1>Apache is working!</h1></body></html>"
+    dest: /var/www/html/index.html
+    mode: '0644'
+    owner: apache
+    group: apache
+  become: yes
+
+- name: Enable and start Apache service
+  service:
+    name: httpd
+    state: started
+    enabled: yes
+  become: yes
+
+- name: Configure Apache to start on boot
+  systemd:
+    name: httpd
+    enabled: yes
+    daemon_reload: yes
+  become: yes 

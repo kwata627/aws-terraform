@@ -1,0 +1,30 @@
+---
+# システムパッケージ管理タスク
+- name: Update system packages
+  dnf:
+    name: '*'
+    state: latest
+  become: yes
+
+- name: Install basic system packages
+  dnf:
+    name:
+      - wget
+      - unzip
+      - git
+      - vim
+      - htop
+    state: present
+  become: yes
+
+# Note: curl is excluded due to conflicts with curl-minimal in Amazon Linux 2023
+# curl-minimal is already available and sufficient for most use cases
+
+- name: Install development tools
+  dnf:
+    name:
+      - gcc
+      - make
+      - python3-pip
+    state: present
+  become: yes 

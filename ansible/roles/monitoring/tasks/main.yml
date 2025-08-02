@@ -1,0 +1,49 @@
+---
+# 監視・ログ設定タスク
+- name: Install monitoring packages
+  dnf:
+    name:
+      - htop
+      - iotop
+      - nethogs
+    state: present
+  become: yes
+
+- name: Create log directory
+  file:
+    path: /var/log/wordpress
+    state: directory
+    mode: '0755'
+    owner: apache
+    group: apache
+  become: yes
+
+- name: Configure logrotate for WordPress
+  template:
+    src: wordpress-logrotate.j2
+    dest: /etc/logrotate.d/wordpress
+    mode: '0644'
+  become: yes
+
+# Note: monitoring.conf.j2 template is not available
+# - name: Configure system monitoring
+#   template:
+#     src: monitoring.conf.j2
+#     dest: /etc/monitoring.conf
+#     mode: '0644'
+#   become: yes
+
+- name: Create monitoring script
+  template:
+    src: check_wordpress.sh.j2
+    dest: /usr/local/bin/check_wordpress.sh
+    mode: '0755'
+  become: yes
+
+# Note: crontab command not available
+# - name: Add monitoring script to crontab
+#   cron:
+#     name: "WordPress monitoring"
+#     hour: "*/6"
+#     job: "/usr/local/bin/check_wordpress.sh"
+#   become: yes 

@@ -1,0 +1,82 @@
+<?php
+/**
+ * WordPress基本設定ファイル
+ */
+
+// ** MySQL設定 - この情報はホスティング先から入手してください ** //
+/** WordPressのためのデータベース名 */
+define( 'DB_NAME', '{{ wordpress_db_name | default('wordpress') }}' );
+
+/** MySQLデータベースのユーザー名 */
+define( 'DB_USER', '{{ wordpress_db_user | default('wordpress') }}' );
+
+/** MySQLデータベースのパスワード */
+define( 'DB_PASSWORD', '{{ wordpress_db_password | default('password') }}' );
+
+/** MySQLのホスト名 */
+define( 'DB_HOST', '{{ wordpress_db_host | default('localhost') }}' );
+
+/** データベースのテーブルを作成する際のデータベース文字セット */
+define( 'DB_CHARSET', '{{ wordpress_db_charset | default('utf8') }}' );
+
+/** データベースの照合順序 */
+define( 'DB_COLLATE', '{{ wordpress_db_collate | default('') }}' );
+
+/**#@+
+ * 認証用ユニークキー
+ */
+define( 'AUTH_KEY',         '{{ wordpress_auth_key | default('put your unique phrase here') }}' );
+define( 'SECURE_AUTH_KEY',  '{{ wordpress_secure_auth_key | default('put your unique phrase here') }}' );
+define( 'LOGGED_IN_KEY',    '{{ wordpress_logged_in_key | default('put your unique phrase here') }}' );
+define( 'NONCE_KEY',        '{{ wordpress_nonce_key | default('put your unique phrase here') }}' );
+define( 'AUTH_SALT',        '{{ wordpress_auth_salt | default('put your unique phrase here') }}' );
+define( 'SECURE_AUTH_SALT', '{{ wordpress_secure_auth_salt | default('put your unique phrase here') }}' );
+define( 'LOGGED_IN_SALT',   '{{ wordpress_logged_in_salt | default('put your unique phrase here') }}' );
+define( 'NONCE_SALT',       '{{ wordpress_nonce_salt | default('put your unique phrase here') }}' );
+
+/**#@-*/
+
+/**
+ * WordPressデータベーステーブルの接頭辞
+ */
+$table_prefix = '{{ wordpress_table_prefix | default('wp_') }}';
+
+/**
+ * 開発者へ: WordPressデバッグモード
+ */
+define( 'WP_DEBUG', {{ wordpress_debug | default('false') }} );
+
+/**
+ * デバッグログを有効にする
+ */
+define( 'WP_DEBUG_LOG', {{ wordpress_debug_log | default('false') }} );
+
+/**
+ * デバッグ表示を無効にする
+ */
+define( 'WP_DEBUG_DISPLAY', {{ wordpress_debug_display | default('false') }} );
+
+/**
+ * 自動更新を無効にする
+ */
+define( 'AUTOMATIC_UPDATER_DISABLED', {{ wordpress_automatic_updater_disabled | default('true') }} );
+
+/**
+ * ファイル編集を無効にする
+ */
+define( 'DISALLOW_FILE_EDIT', {{ wordpress_disallow_file_edit | default('true') }} );
+
+/**
+ * ファイル修正を無効にする
+ */
+define( 'DISALLOW_FILE_MODS', {{ wordpress_disallow_file_mods | default('true') }} );
+
+/* 追加設定値は「さくらのマニュアル」をご利用ください。 */
+
+/** Absolute path to the WordPress directory. */
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', __DIR__ . '/' );
+}
+
+/** Sets up WordPress vars and included files. */
+require_once ABSPATH . 'wp-settings.php'; 

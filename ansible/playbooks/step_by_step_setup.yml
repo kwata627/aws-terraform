@@ -1,0 +1,57 @@
+---
+# 段階的WordPress環境構築プレイブック
+- name: Step 1 - System Setup
+  hosts: wordpress
+  become: yes
+  tags: [system, step1]
+  roles:
+    - system
+
+- name: Step 2 - Security Configuration
+  hosts: wordpress
+  become: yes
+  tags: [security, step2]
+  roles:
+    - security
+
+- name: Step 3 - Apache Installation
+  hosts: wordpress
+  become: yes
+  tags: [apache, step3]
+  roles:
+    - apache
+
+- name: Step 4 - PHP Installation
+  hosts: wordpress
+  become: yes
+  tags: [php, step4]
+  roles:
+    - php
+
+- name: Step 5 - Database Connection
+  hosts: wordpress
+  become: yes
+  tags: [database, step5]
+  roles:
+    - database
+
+- name: Step 6 - WordPress Installation
+  hosts: wordpress
+  become: yes
+  tags: [wordpress, step6]
+  roles:
+    - wordpress
+
+- name: Step 7 - Monitoring Setup
+  hosts: wordpress
+  become: yes
+  tags: [monitoring, step7]
+  roles:
+    - monitoring
+
+- name: Configure SSH for all servers
+  hosts: all
+  become: yes
+  tags: [ssh]
+  roles:
+    - ssh 

@@ -1,0 +1,13 @@
+---
+# Apacheハンドラー
+- name: restart apache
+  service:
+    name: httpd
+    state: restarted
+  become: yes
+
+- name: reload apache
+  service:
+    name: httpd
+    state: reloaded
+  become: yes 

@@ -1,0 +1,3 @@
+ansible/inventory/hosts.yml
+modules/ec2/main.tf
+modules/nat-instance/main.tf

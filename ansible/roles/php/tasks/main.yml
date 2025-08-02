@@ -1,0 +1,40 @@
+---
+# PHP設定タスク
+- name: Install PHP and required modules
+  dnf:
+    name:
+      - php
+      - php-mysqlnd
+      - php-gd
+      - php-mbstring
+      - php-xml
+      - php-curl
+      - php-json
+      - php-opcache
+      - php-zip
+    state: present
+  become: yes
+
+- name: Configure PHP settings
+  template:
+    src: php.ini.j2
+    dest: /etc/php.ini
+    mode: '0644'
+  become: yes
+  notify: restart apache
+
+- name: Configure PHP-FPM settings (if needed)
+  template:
+    src: www.conf.j2
+    dest: /etc/php-fpm.d/www.conf
+    mode: '0644'
+  become: yes
+  when: php_fpm_enabled | default(false)
+
+- name: Enable and start PHP-FPM (if enabled)
+  service:
+    name: php-fpm
+    state: started
+    enabled: yes
+  become: yes
+  when: php_fpm_enabled | default(false) 

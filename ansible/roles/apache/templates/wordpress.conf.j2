@@ -1,0 +1,31 @@
+<VirtualHost *:80>
+    ServerName {{ wordpress_domain | default('localhost') }}
+    DocumentRoot /var/www/html
+    
+    <Directory /var/www/html>
+        AllowOverride All
+        Require all granted
+        Options Indexes FollowSymLinks
+        
+        # WordPress用のリライトルール
+        <IfModule mod_rewrite.c>
+            RewriteEngine On
+            RewriteBase /
+            RewriteRule ^index\.php$ - [L]
+            RewriteCond %{REQUEST_FILENAME} !-f
+            RewriteCond %{REQUEST_FILENAME} !-d
+            RewriteRule . /index.php [L]
+        </IfModule>
+    </Directory>
+    
+    # セキュリティヘッダー
+    <IfModule mod_headers.c>
+        Header always set X-Content-Type-Options nosniff
+        Header always set X-Frame-Options DENY
+        Header always set X-XSS-Protection "1; mode=block"
+    </IfModule>
+    
+    # ログ設定
+    ErrorLog logs/wordpress_error.log
+    CustomLog logs/wordpress_access.log combined
+</VirtualHost> 

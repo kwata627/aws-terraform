@@ -1,0 +1,17 @@
+---
+# システムロールのデフォルト変数
+system_packages:
+  - wget
+  - curl
+  - unzip
+  - git
+  - vim
+  - htop
+
+development_packages:
+  - gcc
+  - make
+  - python3-pip
+
+# システム更新の有効/無効
+system_update: true 

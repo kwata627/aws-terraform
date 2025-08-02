@@ -1,0 +1,10 @@
+---
+# 監視ロールのデフォルト変数
+monitoring_enabled: true
+log_retention_days: 7
+monitoring_interval_hours: 6
+
+# 監視閾値
+disk_usage_threshold: 80
+memory_usage_threshold: 80
+cpu_usage_threshold: 80 

@@ -1,0 +1,20 @@
+---
+# 全環境共通変数
+environment: production
+timezone: Asia/Tokyo
+
+# SSH設定
+ssh_user: ec2-user
+ssh_private_key_file: ~/.ssh/id_rsa
+
+# システム設定
+system_update: true
+security_updates: true
+
+# ログ設定
+log_level: info
+log_retention_days: 7
+
+# 監視設定
+monitoring_enabled: true
+alert_email: admin@example.com 
