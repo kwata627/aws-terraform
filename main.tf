@@ -44,12 +44,13 @@ module "ec2" {
   subnet_id         = module.network.public_subnet_id
   private_subnet_id = module.network.private_subnet_id_1
   security_group_id = module.security.ec2_public_sg_id
-  validation_security_group_id = module.security.ec2_private_sg_id  # 検証用SGを追加
+  validation_security_group_id = module.security.ec2_private_sg_id
   key_name          = module.ssh.key_name
-  ssh_public_key    = module.ssh.public_key_openssh  # 生成されたRSA公開鍵を使用
+  ssh_public_key    = module.ssh.public_key_openssh
   ec2_name          = var.ec2_name
   enable_validation_ec2 = var.enable_validation_ec2
   validation_ec2_name = var.validation_ec2_name
+  environment       = "production"
 }
 
 # RDSモジュール
