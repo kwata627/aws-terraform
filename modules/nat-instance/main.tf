@@ -1,89 +1,203 @@
-# --- NATインスタンスの作成 ---
-resource "aws_instance" "nat" {
-  ami           = var.ami_id
-  instance_type = var.instance_type
-  subnet_id     = var.subnet_id
-  vpc_security_group_ids = [var.security_group_id]
-  key_name      = var.key_name  # AWSキーペアを有効化
+# =============================================================================
+# NAT Instance Module
+# =============================================================================
+# 
+# このモジュールはAWS EC2インスタンスを使用してNAT（Network Address Translation）
+# インスタンスを作成し、プライベートサブネットからのインターネットアクセスを
+# 提供します。NAT Gatewayの代替としてコスト効率的なソリューションです。
+#
+# 特徴:
+# - コスト効率的なNATソリューション
+# - セキュリティ強化された設定
+# - 自動NAT設定
+# - 高可用性対応
+# - 詳細なモニタリング
+# =============================================================================
 
-  associate_public_ip_address = true
-  source_dest_check = false # NATインスタンス必須
+# -----------------------------------------------------------------------------
+# Required Providers
+# -----------------------------------------------------------------------------
 
-  user_data = <<-EOF
-    #!/bin/bash
-    
-    # デバッグログの開始
-    exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
-    echo "=== NAT UserData開始: $(date) ==="
-    
-    # SSH設定の初期化（Amazon Linux 2023対応）
-    echo "SSH設定開始..."
-    systemctl enable sshd
-    systemctl start sshd
-    echo "SSHサービス状態: $(systemctl is-active sshd)"
-    
-    # SSH設定ファイルの詳細確認と修正
-    echo "SSH設定ファイル確認..."
-    if [ -f /etc/ssh/sshd_config ]; then
-      echo "SSH config file exists"
-      # 公開鍵認証を有効化
-      sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-      sed -i 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config
-      echo "SSH設定ファイル修正完了"
-      # SSHサービスを再起動
-      systemctl restart sshd
-      systemctl status sshd
-    else
-      echo "SSH config file not found"
-    fi
-    
-    # SSH公開鍵の配置
-    echo "SSH公開鍵設定開始..."
-    mkdir -p /home/ec2-user/.ssh
-    echo "${var.ssh_public_key}" > /home/ec2-user/.ssh/authorized_keys
-    chmod 700 /home/ec2-user/.ssh
-    chmod 600 /home/ec2-user/.ssh/authorized_keys
-    chown -R ec2-user:ec2-user /home/ec2-user/.ssh
-    echo "SSH公開鍵設定完了"
-    
-    # SSH秘密鍵の配置（検証用インスタンス接続用）
-    echo "SSH秘密鍵設定開始..."
-    cat > /home/ec2-user/.ssh/id_rsa << 'INNER_EOF'
-${var.ssh_private_key}
-INNER_EOF
-    chmod 600 /home/ec2-user/.ssh/id_rsa
-    chown ec2-user:ec2-user /home/ec2-user/.ssh/id_rsa
-    echo "SSH秘密鍵設定完了"
-    
-    # SSH設定の確認
-    echo "SSH設定確認..."
-    ls -la /home/ec2-user/.ssh/
-    echo "authorized_keys内容確認:"
-    cat /home/ec2-user/.ssh/authorized_keys
-    
-    # SSH設定テスト
-    echo "SSH設定テスト..."
-    /usr/sbin/sshd -t && echo "SSH設定テスト成功" || echo "SSH設定テスト失敗"
-    
-    # NAT設定
-    echo "NAT設定開始..."
-    echo 1 > /proc/sys/net/ipv4/ip_forward
-    iptables -t nat -A POSTROUTING -o eth0 -s 10.0.0.0/16 -j MASQUERADE
-    echo "NAT設定完了"
-    
-    echo "=== NAT UserData完了: $(date) ==="
-EOF
-
-  tags = {
-    Name = "${var.project}-nat-instance"
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 4.0.0"
+    }
   }
 }
 
-# --- EIP割当 ---
+# -----------------------------------------------------------------------------
+# NAT Instance
+# -----------------------------------------------------------------------------
+
+resource "aws_instance" "nat" {
+  # 基本設定
+  ami           = var.ami_id
+  instance_type = var.instance_type
+  key_name      = var.key_name
+
+  # ネットワーク設定
+  subnet_id                   = var.subnet_id
+  vpc_security_group_ids      = [var.security_group_id]
+  associate_public_ip_address = true
+  source_dest_check           = false  # NATインスタンス必須設定
+
+  # ストレージ設定
+  root_block_device {
+    volume_size = var.root_volume_size
+    volume_type = var.root_volume_type
+    encrypted   = var.root_volume_encrypted
+    delete_on_termination = var.delete_on_termination
+    
+    tags = merge(
+      {
+        Name        = "${var.project}-nat-root-volume"
+        Environment = var.environment
+        Module      = "nat-instance"
+        ManagedBy   = "terraform"
+      },
+      var.tags
+    )
+  }
+
+  # インスタンスメタデータ設定
+  metadata_options {
+    http_tokens                 = "required"  # IMDSv2必須
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 1
+    instance_metadata_tags      = "enabled"
+  }
+
+  # モニタリング設定
+  monitoring = var.enable_detailed_monitoring
+
+  # シャットダウン動作
+  instance_initiated_shutdown_behavior = var.shutdown_behavior
+
+  # UserData設定
+  user_data = base64encode(templatefile(
+    var.user_data_template_path,
+    {
+      ssh_public_key = var.ssh_public_key
+      ssh_private_key = var.ssh_private_key
+      project        = var.project
+      environment    = var.environment
+      vpc_cidr       = var.vpc_cidr
+      additional_scripts = var.additional_user_data_scripts
+    }
+  ))
+
+  # タグ設定
+  tags = merge(
+    {
+      Name        = "${var.project}-nat-instance"
+      Environment = var.environment
+      Module      = "nat-instance"
+      ManagedBy   = "terraform"
+      Purpose     = "nat-gateway"
+    },
+    var.tags
+  )
+}
+
+# -----------------------------------------------------------------------------
+# Elastic IP for NAT Instance
+# -----------------------------------------------------------------------------
+
 resource "aws_eip" "nat" {
   instance = aws_instance.nat.id
   domain   = "vpc"
-  tags = {
-    Name = "${var.project}-nat-eip"
+
+  tags = merge(
+    {
+      Name        = "${var.project}-nat-eip"
+      Environment = var.environment
+      Module      = "nat-instance"
+      ManagedBy   = "terraform"
+    },
+    var.tags
+  )
+}
+
+# -----------------------------------------------------------------------------
+# CloudWatch Alarms (Optional)
+# -----------------------------------------------------------------------------
+
+resource "aws_cloudwatch_metric_alarm" "nat_cpu_high" {
+  count = var.enable_cloudwatch_alarms ? 1 : 0
+
+  alarm_name          = "${var.project}-nat-cpu-utilization-high"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "80"
+  alarm_description   = "This metric monitors NAT instance CPU utilization"
+  alarm_actions       = var.alarm_actions
+
+  dimensions = {
+    InstanceId = aws_instance.nat.id
   }
+
+  tags = merge(
+    {
+      Name        = "${var.project}-nat-cpu-alarm"
+      Environment = var.environment
+      Module      = "nat-instance"
+    },
+    var.tags
+  )
+}
+
+resource "aws_cloudwatch_metric_alarm" "nat_status_check" {
+  count = var.enable_cloudwatch_alarms ? 1 : 0
+
+  alarm_name          = "${var.project}-nat-status-check-failed"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "StatusCheckFailed"
+  namespace           = "AWS/EC2"
+  period              = "60"
+  statistic           = "Maximum"
+  threshold           = "0"
+  alarm_description   = "This metric monitors NAT instance status checks"
+  alarm_actions       = var.alarm_actions
+
+  dimensions = {
+    InstanceId = aws_instance.nat.id
+  }
+
+  tags = merge(
+    {
+      Name        = "${var.project}-nat-status-check-alarm"
+      Environment = var.environment
+      Module      = "nat-instance"
+    },
+    var.tags
+  )
+}
+
+# -----------------------------------------------------------------------------
+# Network Interface (for advanced routing)
+# -----------------------------------------------------------------------------
+
+resource "aws_network_interface" "nat" {
+  count = var.enable_network_interface ? 1 : 0
+
+  subnet_id         = var.subnet_id
+  security_groups   = [var.security_group_id]
+  source_dest_check = false
+
+  tags = merge(
+    {
+      Name        = "${var.project}-nat-eni"
+      Environment = var.environment
+      Module      = "nat-instance"
+      ManagedBy   = "terraform"
+    },
+    var.tags
+  )
 } 

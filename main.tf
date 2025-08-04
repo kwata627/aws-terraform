@@ -13,8 +13,10 @@ module "nat_instance" {
   ami_id            = var.ami_id
   instance_type     = "t3.nano"
   key_name          = module.ssh.key_name
-  ssh_public_key    = module.ssh.public_key_openssh  # 生成されたRSA公開鍵を使用
-  ssh_private_key   = module.ssh.private_key_pem     # 生成されたRSA秘密鍵を使用
+  ssh_public_key    = module.ssh.public_key_openssh
+  ssh_private_key   = module.ssh.private_key_pem
+  environment       = "production"
+  vpc_cidr          = var.vpc_cidr
 }
 
 # ネットワークモジュール
