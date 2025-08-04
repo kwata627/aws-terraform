@@ -72,6 +72,82 @@ module "security" {
   source   = "./modules/security"
   project  = var.project
   vpc_id   = module.network.vpc_id
+  
+  # セキュリティルール設定
+  security_rules = {
+    ssh = {
+      enabled       = true
+      allowed_cidrs = ["0.0.0.0/0"]
+    }
+    http = {
+      enabled       = true
+      allowed_cidrs = ["0.0.0.0/0"]
+    }
+    https = {
+      enabled       = true
+      allowed_cidrs = ["0.0.0.0/0"]
+    }
+    icmp = {
+      enabled       = true
+      allowed_cidrs = ["0.0.0.0/0"]
+    }
+    private_ssh = {
+      enabled       = true
+      allowed_cidrs = ["10.0.0.0/16"]
+    }
+    private_http = {
+      enabled       = true
+      allowed_cidrs = ["10.0.0.0/16"]
+    }
+    private_https = {
+      enabled       = true
+      allowed_cidrs = ["10.0.0.0/16"]
+    }
+    mysql = {
+      enabled       = true
+      allowed_cidrs = []
+    }
+    postgresql = {
+      enabled       = false
+      allowed_cidrs = []
+    }
+    nat_ssh = {
+      enabled       = true
+      allowed_cidrs = ["0.0.0.0/0"]
+    }
+    nat_icmp = {
+      enabled       = true
+      allowed_cidrs = ["0.0.0.0/0"]
+    }
+    alb_http = {
+      enabled       = true
+      allowed_cidrs = ["0.0.0.0/0"]
+    }
+    alb_https = {
+      enabled       = true
+      allowed_cidrs = ["0.0.0.0/0"]
+    }
+    redis = {
+      enabled       = false
+      allowed_cidrs = []
+    }
+    memcached = {
+      enabled       = false
+      allowed_cidrs = []
+    }
+    egress = {
+      allowed_cidrs = ["0.0.0.0/0"]
+    }
+  }
+  
+  # セキュリティ機能設定
+  enable_security_audit = false
+  enable_security_monitoring = false
+  enable_security_automation = false
+  enable_security_compliance = false
+  
+  # 環境設定
+  environment = "production"
 }
 
 # EC2モジュール
