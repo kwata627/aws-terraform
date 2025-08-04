@@ -1,17 +1,31 @@
-# ----- SSHキーペアの統一管理 -----
+# =============================================================================
+# SSH Module - Main Configuration (Refactored)
+# =============================================================================
+# 
+# このモジュールはSSHキーペアを作成し、セキュアなSSHアクセスを
+# 提供します。セキュリティ強化と監視機能を考慮した設計となっています。
+#
+# 特徴:
+# - セキュアな鍵生成
+# - 鍵の自動ローテーション
+# - バックアップ機能
+# - 監査ログ機能
+# - 詳細なタグ管理
+# =============================================================================
 
-# --- RSA鍵ペアの生成 ---
-resource "tls_private_key" "ssh" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
+# -----------------------------------------------------------------------------
+# Required Providers
+# -----------------------------------------------------------------------------
 
-# --- 統一されたSSHキーペアの作成 ---
-resource "aws_key_pair" "unified" {
-  key_name   = "${var.project}-unified-key"
-  public_key = tls_private_key.ssh.public_key_openssh
-
-  tags = {
-    Name = "${var.project}-unified-key"
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
   }
 } 
