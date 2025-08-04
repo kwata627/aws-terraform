@@ -140,10 +140,50 @@ module "rds" {
 
 # S3モジュール
 module "s3" {
-  source           = "./modules/s3"
-  project          = var.project
-  s3_bucket_name   = var.s3_bucket_name
+  source = "./modules/s3"
+  
+  project = var.project
+  environment = "production"
+  bucket_name = var.s3_bucket_name
+  bucket_purpose = "static-files"
+  
+  # セキュリティ設定
+  enable_versioning = true
+  encryption_algorithm = "AES256"
+  enable_bucket_key = true
+  
+  # パブリックアクセス制御
+  block_public_acls = true
+  block_public_policy = true
+  ignore_public_acls = true
+  restrict_public_buckets = true
+  object_ownership = "BucketOwnerEnforced"
+  bucket_acl = "private"
+  
+  # ライフサイクル管理
+  enable_lifecycle_management = true
+  noncurrent_version_transition_days = 30
+  noncurrent_version_storage_class = "STANDARD_IA"
+  noncurrent_version_expiration_days = 90
+  abort_incomplete_multipart_days = 7
+  enable_object_expiration = false
+  
+  # 監視・ログ設定
+  enable_access_logging = false  # 必要に応じて有効化
+  enable_inventory = false       # 必要に応じて有効化
+  
+  # インテリジェントティアリング
+  enable_intelligent_tiering = false  # 必要に応じて有効化
+  
+  # CloudFront統合
   # cloudfront_distribution_arn = module.cloudfront.distribution_arn # 一時的に無効化
+  
+  # タグ設定
+  tags = {
+    Project     = var.project
+    Environment = "production"
+    ManagedBy   = "terraform"
+  }
 }
 
 # ACMモジュール
