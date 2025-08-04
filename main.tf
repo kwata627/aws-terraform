@@ -8,7 +8,7 @@ module "ssh" {
 module "nat_instance" {
   source            = "./modules/nat-instance"
   project           = var.project
-  subnet_id         = module.network.public_subnet_id
+  subnet_id         = module.network.public_subnet_ids[0]
   security_group_id = module.security.nat_instance_sg_id
   ami_id            = var.ami_id
   instance_type     = "t3.nano"
@@ -21,13 +21,46 @@ module "nat_instance" {
 
 # ネットワークモジュール
 module "network" {
-  source               = "./modules/network"
-  project              = var.project
-  vpc_cidr             = var.vpc_cidr
-  public_subnet_cidr   = var.public_subnet_cidr
-  private_subnet_cidr  = var.private_subnet_cidr
-  az1                  = var.az1
+  source = "./modules/network"
+  
+  project  = var.project
+  vpc_cidr = var.vpc_cidr
+  
+  # パブリックサブネット設定
+  public_subnets = [
+    {
+      cidr = var.public_subnet_cidr
+      az   = var.az1
+    }
+  ]
+  
+  # プライベートサブネット設定
+  private_subnets = [
+    {
+      cidr = var.private_subnet_cidr
+      az   = var.az1
+    }
+  ]
+  
+  # NATインスタンス設定
   nat_instance_network_interface_id = module.nat_instance.nat_instance_network_interface_id
+  enable_nat_route = true
+  
+  # セキュリティ設定
+  enable_network_acls = false  # 必要に応じて有効化
+  enable_vpc_endpoints = false # 必要に応じて有効化
+  enable_flow_logs = false     # 必要に応じて有効化
+  
+  # 環境設定
+  environment = "production"
+  aws_region = "ap-northeast-1"
+  
+  # タグ設定
+  tags = {
+    Project     = var.project
+    Environment = "production"
+    ManagedBy   = "terraform"
+  }
 }
 
 # セキュリティグループモジュール
@@ -43,8 +76,8 @@ module "ec2" {
   project           = var.project
   ami_id            = var.ami_id
   instance_type     = var.instance_type
-  subnet_id         = module.network.public_subnet_id
-  private_subnet_id = module.network.private_subnet_id_1
+  subnet_id         = module.network.public_subnet_ids[0]
+  private_subnet_id = module.network.private_subnet_ids[0]
   security_group_id = module.security.ec2_public_sg_id
   validation_security_group_id = module.security.ec2_private_sg_id
   key_name          = module.ssh.key_name
@@ -59,8 +92,7 @@ module "ec2" {
 module "rds" {
   source                  = "./modules/rds"
   project                 = var.project
-  private_subnet_id_1     = module.network.private_subnet_id_1
-  private_subnet_id_2     = module.network.private_subnet_id_2
+  private_subnet_ids      = module.network.private_subnet_ids
   rds_security_group_id   = module.security.rds_sg_id
   db_password             = var.db_password
   snapshot_date           = var.snapshot_date

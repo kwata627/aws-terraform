@@ -3,7 +3,7 @@
 # --- サブネットグループの作成 ---
 resource "aws_db_subnet_group" "main" {
   name       = "${var.project}-db-subnet-group"
-  subnet_ids = [var.private_subnet_id_1, var.private_subnet_id_2]              # プライベートサブネットに配置
+  subnet_ids = var.private_subnet_ids              # プライベートサブネットに配置
 
   tags = {
     Name = "${var.project}-db-subnet-group"

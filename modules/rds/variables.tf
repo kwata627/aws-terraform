@@ -3,14 +3,9 @@ variable "project" {
   type        = string
 }
 
-variable "private_subnet_id_1" {
-  description = "プライベートサブネット1aのID"
-  type        = string
-}
-
-variable "private_subnet_id_2" {
-  description = "プライベートサブネット1cのID"
-  type        = string
+variable "private_subnet_ids" {
+  description = "プライベートサブネットのID一覧"
+  type        = list(string)
 }
 
 variable "rds_security_group_id" {

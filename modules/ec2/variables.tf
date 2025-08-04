@@ -274,6 +274,6 @@ locals {
   production_instance_name = var.ec2_name != "" ? var.ec2_name : "${var.project}-wordpress-ec2"
   validation_instance_name = var.validation_ec2_name != "" ? var.validation_ec2_name : "${var.project}-validation-ec2"
   
-  # 検証環境の有効性チェック
-  validation_enabled = var.enable_validation_ec2 && var.private_subnet_id != "" && var.validation_security_group_id != ""
+  # 検証環境の有効性チェック（リソース属性に依存しない）
+  validation_enabled = var.enable_validation_ec2
 }
