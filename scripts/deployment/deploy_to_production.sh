@@ -29,8 +29,10 @@ fi
 PROD_EC2_ID=$(jq -r '.production.ec2_instance_id' "$CONFIG_FILE")
 PROD_RDS_ID=$(jq -r '.production.rds_identifier' "$CONFIG_FILE")
 PROD_WP_URL=$(jq -r '.production.wordpress_url' "$CONFIG_FILE")
+PROD_DB_PASSWORD=$(jq -r '.production.db_password' "$CONFIG_FILE")
 VALID_EC2_ID=$(jq -r '.validation.ec2_instance_id' "$CONFIG_FILE")
 VALID_RDS_ID=$(jq -r '.validation.rds_identifier' "$CONFIG_FILE")
+VALID_DB_PASSWORD=$(jq -r '.validation.db_password' "$CONFIG_FILE")
 AUTO_APPROVE=$(jq -r '.deployment.auto_approve' "$CONFIG_FILE")
 NOTIFICATION_EMAIL=$(jq -r '.deployment.notification_email' "$CONFIG_FILE")
 
@@ -69,7 +71,7 @@ fi
 log "ステップ1: 本番環境のバックアップを作成中..."
 BACKUP_FILE="backup_production_$(date +%Y%m%d_%H%M%S).sql"
 mysqldump -h "$(aws rds describe-db-instances --db-instance-identifier "$PROD_RDS_ID" --query 'DBInstances[0].Endpoint.Address' --output text)" \
-    -u admin -p"breadhouse" wordpress > "$BACKUP_FILE"
+    -u admin -p"$PROD_DB_PASSWORD" wordpress > "$BACKUP_FILE"
 log "バックアップ完了: $BACKUP_FILE"
 
 # 本番環境のWordPressファイルのバックアップ
@@ -87,10 +89,10 @@ VALID_RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier "$VA
 PROD_RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier "$PROD_RDS_ID" --query 'DBInstances[0].Endpoint.Address' --output text)
 
 # 検証環境のデータベースをダンプ
-mysqldump -h "$VALID_RDS_ENDPOINT" -u admin -p"breadhouse" wordpress > validation_dump.sql
+mysqldump -h "$VALID_RDS_ENDPOINT" -u admin -p"$VALID_DB_PASSWORD" wordpress > validation_dump.sql
 
 # 本番環境にデータを復元
-mysql -h "$PROD_RDS_ENDPOINT" -u admin -p"breadhouse" wordpress < validation_dump.sql
+mysql -h "$PROD_RDS_ENDPOINT" -u admin -p"$PROD_DB_PASSWORD" wordpress < validation_dump.sql
 
 log "データベース同期完了"
 

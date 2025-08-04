@@ -1,9 +1,10 @@
 # =============================================================================
-# Terraform Variables Configuration (Refactored)
+# Terraform Variables Configuration Example
 # =============================================================================
 # 
-# このファイルはTerraform変数の設定値を含みます。
-# セキュアなインフラ設定とベストプラクティスに沿った設計となっています。
+# このファイルはTerraform変数の設定例です。
+# 実際の使用時は、このファイルをコピーしてterraform.tfvarsとして使用し、
+# 適切な値を設定してください。
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -17,7 +18,7 @@ aws_profile = "default"
 # Project Configuration
 # -----------------------------------------------------------------------------
 
-project = "wp-shamo"
+project = "wp-example"
 environment = "production"
 
 # -----------------------------------------------------------------------------
@@ -33,9 +34,11 @@ az1 = "ap-northeast-1a"
 # EC2 Configuration
 # -----------------------------------------------------------------------------
 
-ec2_name = "wp-shamo-ec2"
-validation_ec2_name = "wp-test-ec2"
-ami_id = "ami-095af7cb7ddb447ef"
+# EC2名（空の場合は自動生成: ${var.project}-ec2）
+ec2_name = ""
+# 検証用EC2名（空の場合は自動生成: ${var.project}-test-ec2）
+validation_ec2_name = ""
+ami_id = "ami-095af7cb7ddb447ef"  # Amazon Linux 2023
 instance_type = "t2.micro"
 root_volume_size = 8
 
@@ -43,33 +46,36 @@ root_volume_size = 8
 # RDS Configuration
 # -----------------------------------------------------------------------------
 
-rds_identifier = "wp-shamo-rds"
+# RDS識別子（空の場合は自動生成: ${var.project}-rds）
+rds_identifier = ""
+# データベースパスワード（必須）
 db_password = "your-secure-password-here"
-snapshot_date = "20250804"
+snapshot_date = "20240101"
 
 # -----------------------------------------------------------------------------
 # S3 Configuration
 # -----------------------------------------------------------------------------
 
-s3_bucket_name = "wp-shamo-s3"
+# S3バケット名（空の場合は自動生成: ${var.project}-s3）
+s3_bucket_name = ""
 
 # -----------------------------------------------------------------------------
 # Domain Configuration
 # -----------------------------------------------------------------------------
 
-domain_name = "shamonooyuuhan.com"
-register_domain = false  # 既存ドメインのためfalseに設定
+domain_name = "example.com"
+register_domain = false  # 既存ドメインの場合はfalseに設定
 
-# ドメイン登録者情報
+# ドメイン登録者情報（新規登録時のみ使用）
 registrant_info = {
-  first_name        = "watanabe"
-  last_name         = "kazuki"
-  organization_name = "My Organization"
-  email            = "wata2watter0903@gmail.com"
-  phone_number     = "+81.80-4178-3008"
-  address_line_1   = "123 Main Street"
-  city             = "Niigata"
-  state            = "Niigata"
+  first_name        = "John"
+  last_name         = "Doe"
+  organization_name = "Example Organization"
+  email            = "admin@example.com"
+  phone_number     = "+81.90-1234-5678"
+  address_line_1   = "123 Example Street"
+  city             = "Tokyo"
+  state            = "Tokyo"
   country_code     = "JP"
   zip_code         = "100-0001"
 }
@@ -97,9 +103,9 @@ ssh_allowed_cidr = "0.0.0.0/0"
 # -----------------------------------------------------------------------------
 
 tags = {
-  Owner       = "watanabe"
+  Owner       = "your-name"
   Purpose     = "wordpress-infrastructure"
   CostCenter  = "development"
   Backup      = "enabled"
   Monitoring  = "enabled"
-}
+} 

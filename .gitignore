@@ -4,5 +4,48 @@
 .terraform/
 crash.log
 
-# Sensitive
+# Sensitive configuration files
 *.tfvars
+!*.tfvars.example
+deployment_config.json
+!deployment_config.example.json
+
+# Logs
+*.log
+logs/
+
+# Backup files
+*.backup
+*.backup.*
+
+# SSH keys
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+
+# Environment specific files
+.env
+.env.local
+.env.production
+.env.staging
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp

@@ -4,6 +4,65 @@
 
 AWS上にTerraformを用いてWordPressブログ環境をIaCとして構築し、インフラの自動化（効率化）について学習するプロジェクトです。本番環境と検証環境を分離し、自動デプロイメントシステムを実装することで、安全で効率的な運用を実現しています。
 
+## セットアップ手順
+
+### 1. リポジトリのクローン
+```bash
+git clone <repository-url>
+cd aws-terraform
+```
+
+### 2. 設定ファイルの準備
+```bash
+# terraform.tfvarsの設定
+cp terraform.tfvars.example terraform.tfvars
+# terraform.tfvarsを編集して適切な値を設定
+
+# deployment_config.jsonの設定
+cp deployment_config.example.json deployment_config.json
+# deployment_config.jsonを編集して適切な値を設定
+```
+
+#### 自動リソース名生成機能
+プロジェクト名（`var.project`）を設定すると、以下のリソース名が自動的に生成されます：
+
+- **EC2名**: `${var.project}-ec2`（例: `my-project-ec2`）
+- **検証用EC2名**: `${var.project}-test-ec2`（例: `my-project-test-ec2`）
+- **RDS識別子**: `${var.project}-rds`（例: `my-project-rds`）
+- **S3バケット名**: `${var.project}-s3`（例: `my-project-s3`）
+
+**使用方法**:
+```bash
+# 自動生成を使用する場合（推奨）
+project = "my-project"
+ec2_name = ""           # 自動生成: my-project-ec2
+rds_identifier = ""     # 自動生成: my-project-rds
+s3_bucket_name = ""     # 自動生成: my-project-s3
+
+# 手動で指定する場合
+project = "my-project"
+ec2_name = "my-custom-ec2"      # 手動指定: my-custom-ec2
+rds_identifier = "my-db"        # 手動指定: my-db
+s3_bucket_name = "my-bucket"    # 手動指定: my-bucket
+```
+
+### 3. AWS認証情報の設定
+```bash
+aws configure
+# AWS Access Key ID, Secret Access Key, Region, Output formatを入力
+```
+
+### 4. Terraformの初期化
+```bash
+terraform init
+```
+
+### 5. インフラのデプロイ
+```bash
+terraform plan
+terraform apply
+```
+
 ## 目的
 
 * Terraformを用いたAWSインフラ構築について学ぶ
@@ -189,7 +248,7 @@ AWS上にTerraformを用いてWordPressブログ環境をIaCとして構築し�
 ### 1. 初期セットアップ
 ```bash
 # 設定ファイル生成
-./manage.sh config your-domain.com 20250803
+./manage.sh config example.com 20240101
 
 # Terraformの初期化
 terraform init
@@ -227,6 +286,27 @@ ansible-playbook playbooks/wordpress_setup.yml
 - **クラウド**: AWS
 - **監視**: CloudWatch （予定）
 - **CI/CD**: GitHub Actions（予定）
+
+## セキュリティに関する重要な注意事項
+
+### 機密情報の管理
+- **terraform.tfvars**: 機密情報を含むため、Gitにコミットしないでください
+- **deployment_config.json**: プロジェクト固有の設定を含むため、Gitにコミットしないでください
+- **SSH鍵**: 秘密鍵は絶対にGitにコミットしないでください
+
+### 本番環境での使用前の確認事項
+1. **SSH許可IPの制限**: `ssh_allowed_cidr`を特定のIPレンジに制限してください
+2. **強力なパスワード**: データベースパスワードを強力なものに変更してください
+3. **ドメイン設定**: 実際のドメイン名に変更してください
+4. **セキュリティグループ**: 必要最小限のポートのみ開放してください
+
+### 推奨設定
+```bash
+# セキュリティ強化のための設定例
+ssh_allowed_cidr = "203.0.113.0/24"  # 特定のIPレンジ
+db_password = "your-very-secure-password-here"
+domain_name = "example.com"
+```
 
 ## ライセンス
 

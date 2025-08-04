@@ -1,0 +1,32 @@
+{
+    "production": {
+        "ec2_instance_id": "i-xxxxxxxxxxxxxxxxx",
+        "rds_identifier": "wp-example-rds",
+        "wordpress_url": "https://example.com",
+        "backup_retention_days": 7,
+        "ssh_user": "ec2-user",
+        "ssh_key_path": "~/.ssh/id_rsa",
+        "db_password": "your-secure-password-here"
+    },
+    "validation": {
+        "ec2_instance_id": "i-yyyyyyyyyyyyyyyyy",
+        "rds_identifier": "wp-example-rds-validation",
+        "wordpress_url": "http://validation-ip",
+        "test_timeout_minutes": 30,
+        "ssh_user": "ec2-user",
+        "ssh_key_path": "~/.ssh/id_rsa",
+        "db_password": "your-secure-password-here"
+    },
+    "deployment": {
+        "auto_approve": false,
+        "rollback_on_failure": true,
+        "notification_email": "admin@example.com",
+        "backup_before_deployment": true,
+        "test_after_deployment": true
+    },
+    "aws": {
+        "region": "ap-northeast-1",
+        "profile": "default",
+        "max_retries": 3
+    }
+} 

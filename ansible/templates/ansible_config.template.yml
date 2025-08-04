@@ -1,0 +1,133 @@
+---
+# Ansible設定テンプレート
+# 環境変数による動的設定
+
+# 全環境共通変数
+all:
+  environment: "{{ ENVIRONMENT | default('production') }}"
+  timezone: "{{ TIMEZONE | default('Asia/Tokyo') }}"
+  
+  # SSH設定
+  ssh_user: "{{ SSH_USER | default('ec2-user') }}"
+  ssh_private_key_file: "{{ SSH_PRIVATE_KEY_FILE | default('~/.ssh/id_rsa') }}"
+  
+  # システム設定
+  system_update: "{{ SYSTEM_UPDATE | default('true') | bool }}"
+  security_updates: "{{ SECURITY_UPDATES | default('true') | bool }}"
+  
+  # ログ設定
+  log_level: "{{ LOG_LEVEL | default('info') }}"
+  log_retention_days: "{{ LOG_RETENTION_DAYS | default(7) | int }}"
+  
+  # 監視設定
+  monitoring_enabled: "{{ MONITORING_ENABLED | default('true') | bool }}"
+  alert_email: "{{ ALERT_EMAIL | default('admin@example.com') }}"
+
+# WordPressサーバー用変数
+wordpress:
+  wordpress_domain: "{{ WORDPRESS_DOMAIN | default(ansible_default_ipv4.address) }}"
+  
+  # データベース設定
+  wordpress_db_host: "{{ WORDPRESS_DB_HOST | default('localhost') }}"
+  wordpress_db_name: "{{ WORDPRESS_DB_NAME | default('wordpress') }}"
+  wordpress_db_user: "{{ WORDPRESS_DB_USER | default('wordpress') }}"
+  wordpress_db_password: "{{ WORDPRESS_DB_PASSWORD | default('password') }}"
+  wordpress_db_charset: "{{ WORDPRESS_DB_CHARSET | default('utf8mb4') }}"
+  
+  # Apache設定
+  wordpress_document_root: "{{ WORDPRESS_DOCUMENT_ROOT | default('/var/www/html') }}"
+  apache_user: "{{ APACHE_USER | default('apache') }}"
+  apache_group: "{{ APACHE_GROUP | default('apache') }}"
+  
+  # PHP設定
+  php_memory_limit: "{{ PHP_MEMORY_LIMIT | default('256M') }}"
+  php_max_execution_time: "{{ PHP_MAX_EXECUTION_TIME | default(300) | int }}"
+  php_upload_max_filesize: "{{ PHP_UPLOAD_MAX_FILESIZE | default('64M') }}"
+  php_post_max_size: "{{ PHP_POST_MAX_SIZE | default('64M') }}"
+  php_date_timezone: "{{ PHP_DATE_TIMEZONE | default('Asia/Tokyo') }}"
+  
+  # セキュリティ設定
+  wordpress_debug: "{{ WORDPRESS_DEBUG | default('false') | bool }}"
+  wordpress_automatic_updater_disabled: "{{ WORDPRESS_AUTOMATIC_UPDATER_DISABLED | default('true') | bool }}"
+  wordpress_disallow_file_edit: "{{ WORDPRESS_DISALLOW_FILE_EDIT | default('true') | bool }}"
+  wordpress_disallow_file_mods: "{{ WORDPRESS_DISALLOW_FILE_MODS | default('true') | bool }}"
+  
+  # 監視設定
+  monitoring_interval_hours: "{{ MONITORING_INTERVAL_HOURS | default(6) | int }}"
+  disk_usage_threshold: "{{ DISK_USAGE_THRESHOLD | default(80) | int }}"
+  memory_usage_threshold: "{{ MEMORY_USAGE_THRESHOLD | default(80) | int }}"
+
+# NATインスタンス用変数
+nat_instance:
+  nat_enabled: "{{ NAT_ENABLED | default('true') | bool }}"
+  nat_forwarding: "{{ NAT_FORWARDING | default('true') | bool }}"
+  
+  # ネットワーク設定
+  nat_interface: "{{ NAT_INTERFACE | default('eth0') }}"
+  nat_gateway: "{{ NAT_GATEWAY | default('') }}"
+  
+  # セキュリティ設定
+  nat_firewall_enabled: "{{ NAT_FIREWALL_ENABLED | default('true') | bool }}"
+  nat_allowed_ports: "{{ NAT_ALLOWED_PORTS | default(['22', '80', '443']) | list }}"
+
+# デプロイメント設定
+deployment:
+  # 実行設定
+  dry_run: "{{ DRY_RUN | default('false') | bool }}"
+  verbose: "{{ VERBOSE | default('false') | bool }}"
+  parallel: "{{ PARALLEL | default('true') | bool }}"
+  
+  # タイムアウト設定
+  connection_timeout: "{{ CONNECTION_TIMEOUT | default(30) | int }}"
+  command_timeout: "{{ COMMAND_TIMEOUT | default(300) | int }}"
+  
+  # 通知設定
+  notification_enabled: "{{ NOTIFICATION_ENABLED | default('false') | bool }}"
+  notification_webhook: "{{ NOTIFICATION_WEBHOOK | default('') }}"
+  notification_slack_channel: "{{ NOTIFICATION_SLACK_CHANNEL | default('') }}"
+  
+  # バックアップ設定
+  backup_enabled: "{{ BACKUP_ENABLED | default('true') | bool }}"
+  backup_retention_days: "{{ BACKUP_RETENTION_DAYS | default(7) | int }}"
+  backup_include_files: "{{ BACKUP_INCLUDE_FILES | default(['/var/www/html', '/etc/apache2']) | list }}"
+
+# AWS設定
+aws:
+  region: "{{ AWS_REGION | default('ap-northeast-1') }}"
+  profile: "{{ AWS_PROFILE | default('default') }}"
+  max_retries: "{{ AWS_MAX_RETRIES | default(3) | int }}"
+  
+  # リソース設定
+  ec2_instance_type: "{{ EC2_INSTANCE_TYPE | default('t3.micro') }}"
+  rds_instance_class: "{{ RDS_INSTANCE_CLASS | default('db.t3.micro') }}"
+  
+  # タグ設定
+  resource_tags:
+    Environment: "{{ ENVIRONMENT | default('production') }}"
+    Project: "{{ PROJECT_NAME | default('wordpress') }}"
+    ManagedBy: "{{ MANAGED_BY | default('ansible') }}"
+    CreatedBy: "{{ CREATED_BY | default('terraform') }}"
+
+# セキュリティ設定
+security:
+  # SSH設定
+  ssh_allowed_ip: "{{ SSH_ALLOWED_IP | default('0.0.0.0/0') }}"
+  ssh_port: "{{ SSH_PORT | default(22) | int }}"
+  ssh_key_rotation_days: "{{ SSH_KEY_ROTATION_DAYS | default(90) | int }}"
+  
+  # ファイアウォール設定
+  firewall_enabled: "{{ FIREWALL_ENABLED | default('true') | bool }}"
+  firewall_allowed_ports: "{{ FIREWALL_ALLOWED_PORTS | default(['22', '80', '443']) | list }}"
+  
+  # SSL/TLS設定
+  ssl_enabled: "{{ SSL_ENABLED | default('true') | bool }}"
+  ssl_certificate_path: "{{ SSL_CERTIFICATE_PATH | default('/etc/ssl/certs') }}"
+  ssl_private_key_path: "{{ SSL_PRIVATE_KEY_PATH | default('/etc/ssl/private') }}"
+  
+  # セキュリティヘッダー設定
+  security_headers_enabled: "{{ SECURITY_HEADERS_ENABLED | default('true') | bool }}"
+  security_headers:
+    X-Frame-Options: "{{ X_FRAME_OPTIONS | default('SAMEORIGIN') }}"
+    X-Content-Type-Options: "{{ X_CONTENT_TYPE_OPTIONS | default('nosniff') }}"
+    X-XSS-Protection: "{{ X_XSS_PROTECTION | default('1; mode=block') }}"
+    Strict-Transport-Security: "{{ HSTS_HEADER | default('max-age=31536000; includeSubDomains') }}" 

@@ -7,6 +7,7 @@
 4. [記事更新手順](#記事更新手順)
 5. [トラブルシューティング](#トラブルシューティング)
 6. [定期メンテナンス](#定期メンテナンス)
+7. [セキュリティガイドライン](#セキュリティガイドライン)
 
 ---
 
@@ -19,6 +20,7 @@
 - **本番環境**: 一般公開されているWordPressサイト（常時起動）
 - **検証環境**: 変更をテストするための環境（必要時のみ起動）
 - **データベース**: RDS MySQL（自動バックアップあり）
+- **セキュリティ**: 多層防御によるセキュリティ強化
 
 ---
 
@@ -27,13 +29,15 @@
 ### 本番環境
 - **サーバー**: EC2（t2.micro）
 - **データベース**: RDS MySQL（db.t3.micro）
-- **ドメイン**: 設定されたドメイン名
+- **ドメイン**: example.com
 - **アクセス**: インターネットから直接アクセス可能
+- **セキュリティ**: WAF、セキュリティグループ、暗号化通信
 
 ### 検証環境
 - **サーバー**: 検証用EC2（通常は停止状態）
 - **データベース**: 検証用RDS（本番データのコピー）
 - **アクセス**: NAT経由でのみアクセス可能
+- **セキュリティ**: プライベートサブネット、制限されたアクセス
 
 ---
 
@@ -50,11 +54,14 @@ terraform output -raw wordpress_public_ip
 
 # 検証環境のIPアドレス
 terraform output -raw validation_private_ip
+
+# 接続情報の確認
+terraform output -raw connection_info
 ```
 
 ### 2. WordPress管理画面へのアクセス
 
-1. **本番環境**: `http://[本番IP]/wp-admin`
+1. **本番環境**: `https://example.com/wp-admin`
 2. **検証環境**: `http://[検証IP]/wp-admin`
 
 ### 3. 日常的な確認事項
@@ -63,6 +70,8 @@ terraform output -raw validation_private_ip
 - [ ] 管理画面にログインできるか
 - [ ] 新規投稿が作成できるか
 - [ ] コメントが正常に表示されるか
+- [ ] SSL証明書が有効か
+- [ ] セキュリティログに異常がないか
 
 ---
 
@@ -72,7 +81,7 @@ terraform output -raw validation_private_ip
 
 ```bash
 # 自動デプロイメントスクリプトを実行
-./scripts/auto_deployment.sh
+./scripts/deployment/auto_deployment.sh
 ```
 
 **実行される処理:**
@@ -86,7 +95,7 @@ terraform output -raw validation_private_ip
 1. **検証環境にアクセス**
    ```bash
    # 検証環境への接続
-   ./connect_validation.sh
+   ./scripts/deployment/prepare_validation.sh
    ```
 
 2. **WordPress管理画面へのログイン**
@@ -157,6 +166,7 @@ aws rds stop-db-instance --db-instance-identifier wp-shamo-rds-validation
 - EC2インスタンスが起動しているか
 - セキュリティグループの設定
 - ドメインのDNS設定
+- SSL証明書の有効性
 
 **対処法:**
 ```bash
@@ -165,6 +175,9 @@ aws ec2 describe-instances --instance-ids [インスタンスID]
 
 # セキュリティグループの確認
 aws ec2 describe-security-groups --group-ids [セキュリティグループID]
+
+# SSL証明書の確認
+aws acm describe-certificate --certificate-arn [証明書ARN]
 ```
 
 #### 2. WordPress管理画面にログインできない
@@ -172,11 +185,15 @@ aws ec2 describe-security-groups --group-ids [セキュリティグループID]
 **確認事項:**
 - ユーザー名とパスワードが正しいか
 - データベース接続が正常か
+- ファイル権限が正しいか
 
 **対処法:**
 ```bash
 # データベース接続テスト
 mysql -h [RDSエンドポイント] -u [ユーザー名] -p
+
+# WordPressファイルの権限確認
+ssh -i ~/.ssh/id_rsa ec2-user@[EC2_IP] "ls -la /var/www/html/"
 ```
 
 #### 3. 検証環境にアクセスできない
@@ -188,6 +205,9 @@ aws ec2 describe-instances --instance-ids [検証用EC2のID]
 
 # NATインスタンスの状態確認
 aws ec2 describe-instances --instance-ids [NATインスタンスID]
+
+# ルートテーブルの確認
+aws ec2 describe-route-tables --filters "Name=vpc-id,Values=[VPC_ID]"
 ```
 
 #### 4. 記事が本番環境に反映されない
@@ -196,23 +216,29 @@ aws ec2 describe-instances --instance-ids [NATインスタンスID]
 ```bash
 # データベース接続の確認
 mysql -h [本番RDSエンドポイント] -u admin -p -e "USE wordpress; SELECT * FROM wp_posts WHERE post_status='publish' ORDER BY post_date DESC LIMIT 5;"
+
+# ファイル同期の確認
+rsync -avz --delete /path/to/validation/wordpress/ /path/to/production/wordpress/
 ```
 
 ### ログの確認
 
 ```bash
 # WordPress EC2のログ確認
-./check_userdata_logs.sh
+./scripts/maintenance/check_logs.sh
 
 # システムログの確認
-ssh ec2-user@[本番IP] "sudo journalctl -f"
+ssh -i ~/.ssh/id_rsa ec2-user@[本番IP] "sudo journalctl -f"
+
+# セキュリティログの確認
+aws logs describe-log-groups --log-group-name-prefix "/aws/wordpress"
 ```
 
 ### 緊急時のロールバック
 
 ```bash
 # ロールバックの実行
-./scripts/rollback.sh
+./scripts/maintenance/rollback.sh
 ```
 
 ---
@@ -223,16 +249,49 @@ ssh ec2-user@[本番IP] "sudo journalctl -f"
 - [ ] サイトの動作確認
 - [ ] エラーログの確認
 - [ ] バックアップの確認
+- [ ] セキュリティログの確認
 
 ### 毎週の確認
 - [ ] WordPressの更新確認
 - [ ] プラグインの更新確認
 - [ ] セキュリティスキャン
+- [ ] パフォーマンスの確認
 
 ### 毎月の確認
-- [ ] パフォーマンスの確認
+- [ ] パフォーマンスの詳細確認
 - [ ] ストレージ使用量の確認
 - [ ] コストの確認
+- [ ] セキュリティ設定の見直し
+
+### 四半期の確認
+- [ ] セキュリティ監査
+- [ ] バックアップ戦略の見直し
+- [ ] パフォーマンス最適化
+- [ ] ドキュメントの更新
+
+---
+
+## セキュリティガイドライン
+
+### 1. アクセス制御
+- **SSH接続**: 特定IPからのみ許可
+- **管理画面**: 強力なパスワードの使用
+- **データベース**: 最小権限の原則
+
+### 2. データ保護
+- **暗号化**: 転送時・保存時の暗号化
+- **バックアップ**: 自動バックアップの確認
+- **監査ログ**: すべての操作の記録
+
+### 3. セキュリティ監視
+- **WAF**: Webアプリケーションファイアウォール
+- **CloudWatch**: セキュリティイベントの監視
+- **GuardDuty**: 脅威検出
+
+### 4. 緊急時対応
+- **インシデント対応**: 問題発生時の迅速な対応
+- **通知システム**: セキュリティイベントの通知
+- **復旧手順**: データ復旧の手順
 
 ---
 
@@ -243,6 +302,8 @@ ssh ec2-user@[本番IP] "sudo journalctl -f"
 3. **緊急時以外は営業時間内に作業を実施**
 4. **すべての変更は記録を残す**
 5. **セキュリティを最優先に考慮**
+6. **定期的なセキュリティ監査を実施**
+7. **パスワードの定期変更を実施**
 
 ---
 

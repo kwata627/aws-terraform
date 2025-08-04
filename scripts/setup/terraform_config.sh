@@ -1,55 +1,69 @@
 #!/bin/bash
 
+# =============================================================================
 # Terraform設定管理スクリプト
-# 使用方法: ./terraform_config.sh [--update-only]
+# =============================================================================
 
-set -e
+# 共通ライブラリの読み込み
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/common.sh"
 
-# 色付きログ関数
-log_info() {
-    echo -e "\033[32m[INFO]\033[0m $1"
-}
+# =============================================================================
+# 定数定義
+# =============================================================================
 
-log_warn() {
-    echo -e "\033[33m[WARN]\033[0m $1"
-}
+readonly SCRIPT_NAME="Terraform設定管理"
+readonly CONFIG_TEMPLATE="$SCRIPT_DIR/../templates/deployment_config.template.json"
+readonly TERRAFORM_VARS_FILE="terraform.tfvars"
+readonly DEPLOYMENT_CONFIG_FILE="deployment_config.json"
 
-log_error() {
-    echo -e "\033[31m[ERROR]\033[0m $1"
-}
-
-log_input() {
-    echo -e "\033[36m[INPUT]\033[0m $1"
-}
+# =============================================================================
+# 関数定義
+# =============================================================================
 
 # 使用方法の表示
 usage() {
-    echo "Terraform設定管理スクリプト"
-    echo ""
-    echo "使用方法:"
-    echo "  $0                    # 新規設定ファイル生成"
-    echo "  $0 --update-only      # 既存設定の更新"
-    echo ""
-    echo "機能:"
-    echo "- ドメイン名の設定"
-    echo "- スナップショット日付の設定"
-    echo "- SSH許可IPの設定"
-    echo "- 検証環境の設定"
-    echo "- 登録者情報の設定"
-    echo "- 既存ドメインの自動検出"
-    echo "- terraform.tfvarsの生成・更新"
+    cat << EOF
+Terraform設定管理スクリプト
+
+使用方法:
+  $0                    # 新規設定ファイル生成
+  $0 --update-only      # 既存設定の更新
+  $0 --help            # このヘルプを表示
+
+機能:
+- ドメイン名の設定
+- スナップショット日付の設定
+- SSH許可IPの設定
+- 検証環境の設定
+- 登録者情報の設定
+- 既存ドメインの自動検出
+- terraform.tfvarsの生成・更新
+- deployment_config.jsonの生成・更新
+
+環境変数:
+- DOMAIN_NAME: ドメイン名
+- SNAPSHOT_DATE: スナップショット日付
+- SSH_ALLOWED_IP: SSH許可IP
+- VALIDATION_ENABLED: 検証環境有効化 (true/false)
+- REGISTRANT_NAME: 登録者名
+- REGISTRANT_EMAIL: 登録者メールアドレス
+- REGISTRANT_PHONE: 登録者電話番号
+
+EOF
 }
 
 # 既存ドメインの検出
 check_existing_domain() {
-    local domain_name=$1
+    local domain_name="$1"
     
     # 初期値は新規ドメインとして設定
-    register_domain="true"
+    local register_domain="true"
     
     # Terraform stateで既存のホストゾーンを確認
-    if terraform state list | grep -q "module.route53.aws_route53_zone.main"; then
-        local existing_domain=$(terraform state show module.route53.aws_route53_zone.main 2>/dev/null | grep "name" | head -1 | awk '{print $3}' | tr -d '"')
+    if terraform state list | grep -q "module.route53.aws_route53_zone.main" 2>/dev/null; then
+        local existing_domain
+        existing_domain=$(terraform state show module.route53.aws_route53_zone.main 2>/dev/null | grep "name" | head -1 | awk '{print $3}' | tr -d '"')
         
         if [ "$existing_domain" = "$domain_name" ]; then
             log_warn "注意: このドメイン名は既にTerraformで管理されています"
@@ -61,7 +75,8 @@ check_existing_domain() {
     # Route53でドメイン登録の確認（us-east-1リージョンで確認）
     if command -v aws >/dev/null 2>&1; then
         # AWS CLIでドメイン登録状況を確認
-        local domain_exists=$(aws route53domains list-domains --region us-east-1 --query "Domains[?DomainName=='$domain_name'].DomainName" --output text 2>/dev/null)
+        local domain_exists
+        domain_exists=$(aws route53domains list-domains --region us-east-1 --query "Domains[?DomainName=='$domain_name'].DomainName" --output text 2>/dev/null)
         
         if [ "$domain_exists" = "$domain_name" ]; then
             log_warn "注意: このドメインは既にRoute53で登録されています"
@@ -75,6 +90,8 @@ check_existing_domain() {
         log_warn "AWS CLIが利用できません。ドメイン登録状況を確認できません。"
         log_warn "手動でドメイン登録状況を確認してください。"
     fi
+    
+    echo "$register_domain"
 }
 
 # 対話的な入力（新規設定時）
@@ -86,318 +103,292 @@ interactive_input() {
     log_input "ドメイン名を入力してください (例: example.com): "
     read -p "> " domain_name
     if [ -z "$domain_name" ]; then
-        log_error "ドメイン名は必須です"
-        exit 1
+        error_exit "ドメイン名は必須です"
     fi
     
     # 既存ドメインの検出
-    check_existing_domain "$domain_name"
+    local register_domain
+    register_domain=$(check_existing_domain "$domain_name")
     
     # スナップショット日付の入力
     log_input "スナップショット日付を入力してください (例: 20250803): "
     read -p "> " snapshot_date
     if [ -z "$snapshot_date" ]; then
-        log_error "スナップショット日付は必須です"
-        exit 1
+        error_exit "スナップショット日付は必須です"
     fi
     
     # SSH許可IPの入力
-    log_input "SSH許可IPを入力してください (デフォルト: 0.0.0.0/0): "
-    read -p "> " ssh_allowed_cidr
-    ssh_allowed_cidr=${ssh_allowed_cidr:-"0.0.0.0/0"}
+    log_input "SSH許可IPを入力してください (例: 192.168.1.1/32): "
+    read -p "> " ssh_allowed_ip
+    if [ -z "$ssh_allowed_ip" ]; then
+        error_exit "SSH許可IPは必須です"
+    fi
     
     # 検証環境の設定
-    log_input "検証用EC2を有効にしますか？ (y/N): "
-    read -p "> " enable_validation_ec2_input
-    if [ "$enable_validation_ec2_input" = "y" ] || [ "$enable_validation_ec2_input" = "Y" ]; then
-        enable_validation_ec2="true"
-    else
-        enable_validation_ec2="false"
-    fi
-    
-    log_input "検証用RDSを有効にしますか？ (y/N): "
-    read -p "> " enable_validation_rds_input
-    if [ "$enable_validation_rds_input" = "y" ] || [ "$enable_validation_rds_input" = "Y" ]; then
-        enable_validation_rds="true"
-    else
-        enable_validation_rds="false"
-    fi
+    log_input "検証環境を有効にしますか？ (y/N): "
+    read -p "> " validation_enabled
+    validation_enabled=${validation_enabled:-N}
     
     # 登録者情報の入力
-    echo ""
-    log_info "ドメイン登録者情報を入力してください"
-    echo ""
-    
-    log_input "姓を入力してください: "
-    read -p "> " first_name
-    first_name=${first_name:-"Admin"}
-    
-    log_input "名を入力してください: "
-    read -p "> " last_name
-    last_name=${last_name:-"User"}
-    
-    log_input "組織名を入力してください: "
-    read -p "> " organization_name
-    organization_name=${organization_name:-"My Organization"}
-    
-    log_input "メールアドレスを入力してください: "
-    read -p "> " email
-    email=${email:-"admin@example.com"}
-    
-    log_input "電話番号を入力してください (例: +81.1234567890): "
-    read -p "> " phone_number
-    phone_number=${phone_number:-"+81.1234567890"}
-    
-    log_input "住所（1行目）を入力してください: "
-    read -p "> " address_line_1
-    address_line_1=${address_line_1:-"123 Main Street"}
-    
-    log_input "市区町村を入力してください: "
-    read -p "> " city
-    city=${city:-"Tokyo"}
-    
-    log_input "都道府県を入力してください: "
-    read -p "> " state
-    state=${state:-"Tokyo"}
-    
-    log_input "国コードを入力してください (例: JP): "
-    read -p "> " country_code
-    country_code=${country_code:-"JP"}
-    
-    log_input "郵便番号を入力してください: "
-    read -p "> " zip_code
-    zip_code=${zip_code:-"100-0001"}
-    
-    # 設定の確認
-    echo ""
-    log_info "設定内容を確認してください:"
-    echo "=================================="
-    echo "ドメイン名: $domain_name"
-    echo "スナップショット日付: $snapshot_date"
-    echo "SSH許可IP: $ssh_allowed_cidr"
-    echo "検証用EC2: $enable_validation_ec2"
-    echo "検証用RDS: $enable_validation_rds"
-    echo "ドメイン登録: $register_domain"
-    echo ""
-    echo "登録者情報:"
-    echo "  姓: $first_name"
-    echo "  名: $last_name"
-    echo "  組織名: $organization_name"
-    echo "  メール: $email"
-    echo "  電話: $phone_number"
-    echo "  住所: $address_line_1"
-    echo "  市区町村: $city"
-    echo "  都道府県: $state"
-    echo "  国コード: $country_code"
-    echo "  郵便番号: $zip_code"
-    echo "=================================="
-    
-    log_input "この設定で続行しますか？ (y/N): "
-    read -p "> " confirm
-    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-        log_info "設定をキャンセルしました"
-        exit 0
+    log_input "登録者名を入力してください: "
+    read -p "> " registrant_name
+    if [ -z "$registrant_name" ]; then
+        error_exit "登録者名は必須です"
     fi
+    
+    log_input "登録者メールアドレスを入力してください: "
+    read -p "> " registrant_email
+    if [ -z "$registrant_email" ]; then
+        error_exit "登録者メールアドレスは必須です"
+    fi
+    
+    log_input "登録者電話番号を入力してください (例: +81.1234567890): "
+    read -p "> " registrant_phone
+    if [ -z "$registrant_phone" ]; then
+        error_exit "登録者電話番号は必須です"
+    fi
+    
+    # 設定の保存
+    save_config "$domain_name" "$snapshot_date" "$ssh_allowed_ip" "$validation_enabled" "$registrant_name" "$registrant_email" "$registrant_phone" "$register_domain"
 }
 
-# 設定ファイルの生成
-generate_config() {
-    local domain_name=$1
-    local snapshot_date=$2
-    local ssh_allowed_cidr=$3
-    local enable_validation_ec2=$4
-    local enable_validation_rds=$5
-    local first_name=$6
-    local last_name=$7
-    local organization_name=$8
-    local email=$9
-    local phone_number=${10}
-    local address_line_1=${11}
-    local city=${12}
-    local state=${13}
-    local country_code=${14}
-    local zip_code=${15}
-    local register_domain=${16:-"true"}
+# 設定の保存
+save_config() {
+    local domain_name="$1"
+    local snapshot_date="$2"
+    local ssh_allowed_ip="$3"
+    local validation_enabled="$4"
+    local registrant_name="$5"
+    local registrant_email="$6"
+    local registrant_phone="$7"
+    local register_domain="$8"
     
-    log_info "terraform.tfvarsを生成中..."
-    
-    # 既存のファイルをバックアップ
-    if [ -f "terraform.tfvars" ]; then
-        cp terraform.tfvars "terraform.tfvars.backup.$(date +%Y%m%d_%H%M%S)"
-        log_info "既存のterraform.tfvarsをバックアップしました"
-    fi
-    
-    # 新しいterraform.tfvarsを作成
-    cat > terraform.tfvars << EOF
-aws_region = "ap-northeast-1"
-aws_profile = "default"
+    # terraform.tfvarsの生成
+    log_step "terraform.tfvarsを生成中..."
+    cat > "$TERRAFORM_VARS_FILE" << EOF
+# WordPress AWS環境設定
+# 生成日時: $(date)
 
 # ドメイン設定
 domain_name = "$domain_name"
+register_domain = $register_domain
 
 # スナップショット設定
 snapshot_date = "$snapshot_date"
 
-# 検証環境の設定
-enable_validation_ec2 = $enable_validation_ec2    # 検証用EC2（停止状態で作成）
-enable_validation_rds = $enable_validation_rds    # 検証用RDS（停止状態で作成）
+# セキュリティ設定
+ssh_allowed_ip = "$ssh_allowed_ip"
 
-# SSH接続許可IP（セキュリティ強化）
-# 例: "203.0.113.0/24"  # 特定のIPレンジ
-# 例: "192.168.1.0/24"   # ローカルネットワーク
-# 注意: 本番環境では必ず特定IPに制限してください
-ssh_allowed_cidr = "$ssh_allowed_cidr"
+# 検証環境設定
+validation_enabled = $([ "$validation_enabled" = "y" ] && echo "true" || echo "false")
 
-# ドメイン登録設定
-register_domain = $register_domain  # 新規ドメイン: true, 既存ドメイン: false
-
-# ドメイン登録者情報
-registrant_info = {
-  first_name        = "$first_name"
-  last_name         = "$last_name"
-  organization_name = "$organization_name"
-  email            = "$email"
-  phone_number     = "$phone_number"
-  address_line_1   = "$address_line_1"
-  city             = "$city"
-  state            = "$state"
-  country_code     = "$country_code"
-  zip_code         = "$zip_code"
-}
+# 登録者情報
+registrant_name = "$registrant_name"
+registrant_email = "$registrant_email"
+registrant_phone = "$registrant_phone"
 EOF
     
-    log_info "terraform.tfvarsを生成しました"
+    log_success "terraform.tfvarsを生成しました"
     
-    # deployment_config.jsonの更新
-    log_info "deployment_config.jsonを更新中..."
+    # deployment_config.jsonの生成
+    log_step "deployment_config.jsonを生成中..."
+    if [ -f "$CONFIG_TEMPLATE" ]; then
+        # テンプレートから環境変数を置換
+        envsubst < "$CONFIG_TEMPLATE" > "$DEPLOYMENT_CONFIG_FILE"
+        log_success "deployment_config.jsonを生成しました"
+    else
+        log_warn "テンプレートファイルが見つかりません: $CONFIG_TEMPLATE"
+        log_info "手動でdeployment_config.jsonを設定してください"
+    fi
     
-    cat > deployment_config.json << EOF
-{
-    "production": {
-        "ec2_instance_id": "",
-        "rds_identifier": "wp-shamo-rds",
-        "wordpress_url": "http://$domain_name",
-        "backup_retention_days": 7
-    },
-    "validation": {
-        "ec2_instance_id": "",
-        "rds_identifier": "wp-shamo-rds-validation",
-        "wordpress_url": "http://validation-ip",
-        "test_timeout_minutes": 30
-    },
-    "deployment": {
-        "auto_approve": false,
-        "rollback_on_failure": true,
-        "notification_email": ""
-    }
-}
-EOF
-    
-    log_info "deployment_config.jsonを更新しました"
+    # 設定の確認
+    log_step "設定内容を確認中..."
+    echo ""
+    echo "=== 設定内容 ==="
+    echo "ドメイン名: $domain_name"
+    echo "スナップショット日付: $snapshot_date"
+    echo "SSH許可IP: $ssh_allowed_ip"
+    echo "検証環境: $([ "$validation_enabled" = "y" ] && echo "有効" || echo "無効")"
+    echo "登録者名: $registrant_name"
+    echo "登録者メール: $registrant_email"
+    echo "登録者電話: $registrant_phone"
+    echo "ドメイン登録: $([ "$register_domain" = "true" ] && echo "新規登録" || echo "既存使用")"
+    echo ""
     
     # ドメイン登録の確認
-    echo ""
     if [ "$register_domain" = "true" ]; then
-        log_warn "新規ドメインとして検出されました: $domain_name"
-        log_input "ドメイン登録を実行しますか？ (y/N): "
-        read -p "> " confirm_domain_registration
-        if [ "$confirm_domain_registration" != "y" ] && [ "$confirm_domain_registration" != "Y" ]; then
-            log_info "ドメイン登録をスキップします"
-            # register_domainをfalseに変更
-            sed -i 's/^register_domain = true.*$/register_domain = false  # ドメイン登録をスキップ/' terraform.tfvars
-            log_info "terraform.tfvarsを更新しました: register_domain = false"
-        else
-            log_info "ドメイン登録を実行します: register_domain = true"
+        log_warn "注意: ドメイン登録には料金が発生します（年間約$12-15）"
+        log_input "ドメインを登録しますか？ (y/N): "
+        read -p "> " confirm_register
+        if [ "$confirm_register" != "y" ]; then
+            log_info "ドメイン登録をキャンセルしました"
+            # register_domainをfalseに更新
+            sed -i 's/register_domain = true/register_domain = false/' "$TERRAFORM_VARS_FILE"
         fi
-    else
-        log_info "既存ドメインとして検出されました: $domain_name"
-        log_info "ドメイン登録はスキップされます: register_domain = false"
     fi
+    
+    log_success "設定ファイルの生成が完了しました"
 }
 
 # 既存設定の更新
 update_existing_config() {
-    log_info "既存設定の更新を開始します..."
+    log_step "既存設定の更新を開始..."
     
-    # ドメイン名を取得
-    if [ -f "terraform.tfvars" ]; then
-        local domain_name=$(grep "^domain_name" terraform.tfvars | cut -d'"' -f2)
-        log_info "対象ドメイン: $domain_name"
-    else
-        log_error "terraform.tfvarsファイルが見つかりません"
-        exit 1
+    # 既存ファイルの確認
+    if [ ! -f "$TERRAFORM_VARS_FILE" ]; then
+        error_exit "既存の設定ファイルが見つかりません: $TERRAFORM_VARS_FILE"
     fi
     
-    # 既存ドメインの検出
-    check_existing_domain "$domain_name"
+    # バックアップ作成
+    create_backup "$TERRAFORM_VARS_FILE"
     
-    log_info "terraform.tfvarsを更新中..."
+    # 現在の設定を読み込み
+    local current_domain
+    current_domain=$(grep "^domain_name" "$TERRAFORM_VARS_FILE" | cut -d'"' -f2)
     
-    # 既存のファイルをバックアップ
-    if [ -f "terraform.tfvars" ]; then
-        cp terraform.tfvars "terraform.tfvars.backup.$(date +%Y%m%d_%H%M%S)"
-        log_info "既存のterraform.tfvarsをバックアップしました"
-    fi
+    log_info "現在のドメイン: $current_domain"
     
-    # register_domainの値を更新
-    if [ "$register_domain" = "true" ]; then
-        # 新規ドメインの場合
-        sed -i 's/^register_domain = false.*$/register_domain = true  # 新規ドメインのためtrueに設定/' terraform.tfvars
-        log_info "新規ドメインとして設定しました: register_domain = true"
-    else
-        # 既存ドメインの場合
-        sed -i 's/^register_domain = true.*$/register_domain = false  # 既存ドメインのためfalseに設定/' terraform.tfvars
-        sed -i 's/^register_domain = false.*$/register_domain = false  # 既存ドメインのためfalseに設定/' terraform.tfvars
-        log_info "既存ドメインとして設定しました: register_domain = false"
-    fi
+    # 更新項目の確認
+    log_input "更新する項目を選択してください:"
+    echo "1. SSH許可IP"
+    echo "2. 検証環境設定"
+    echo "3. 登録者情報"
+    echo "4. すべて"
+    read -p "選択 (1-4): " update_choice
     
-    log_info "terraform.tfvarsの更新が完了しました"
+    case "$update_choice" in
+        1)
+            update_ssh_ip
+            ;;
+        2)
+            update_validation_setting
+            ;;
+        3)
+            update_registrant_info
+            ;;
+        4)
+            update_ssh_ip
+            update_validation_setting
+            update_registrant_info
+            ;;
+        *)
+            error_exit "無効な選択です"
+            ;;
+    esac
     
-    # ドメイン登録の確認
-    echo ""
-    if [ "$register_domain" = "true" ]; then
-        log_warn "新規ドメインとして検出されました: $domain_name"
-        log_input "ドメイン登録を実行しますか？ (y/N): "
-        read -p "> " confirm_domain_registration
-        if [ "$confirm_domain_registration" != "y" ] && [ "$confirm_domain_registration" != "Y" ]; then
-            log_info "ドメイン登録をスキップします"
-            # register_domainをfalseに変更
-            sed -i 's/^register_domain = true.*$/register_domain = false  # ドメイン登録をスキップ/' terraform.tfvars
-            log_info "terraform.tfvarsを更新しました: register_domain = false"
-        else
-            log_info "ドメイン登録を実行します: register_domain = true"
-        fi
-    else
-        log_info "既存ドメインとして検出されました: $domain_name"
-        log_info "ドメイン登録はスキップされます: register_domain = false"
-    fi
+    log_success "設定の更新が完了しました"
 }
 
-# メイン処理
-main() {
-    # ヘルプ表示
-    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        usage
-        exit 0
+# SSH許可IPの更新
+update_ssh_ip() {
+    log_input "新しいSSH許可IPを入力してください: "
+    read -p "> " new_ssh_ip
+    if [ -z "$new_ssh_ip" ]; then
+        error_exit "SSH許可IPは必須です"
     fi
     
-    # 更新モードの確認
-    if [ "$1" = "--update-only" ]; then
+    # 設定ファイルの更新
+    sed -i "s|ssh_allowed_ip = \".*\"|ssh_allowed_ip = \"$new_ssh_ip\"|" "$TERRAFORM_VARS_FILE"
+    log_info "SSH許可IPを更新しました: $new_ssh_ip"
+}
+
+# 検証環境設定の更新
+update_validation_setting() {
+    log_input "検証環境を有効にしますか？ (y/N): "
+    read -p "> " new_validation_setting
+    new_validation_setting=${new_validation_setting:-N}
+    
+    local validation_value
+    validation_value=$([ "$new_validation_setting" = "y" ] && echo "true" || echo "false")
+    
+    # 設定ファイルの更新
+    sed -i "s|validation_enabled = .*|validation_enabled = $validation_value|" "$TERRAFORM_VARS_FILE"
+    log_info "検証環境設定を更新しました: $validation_value"
+}
+
+# 登録者情報の更新
+update_registrant_info() {
+    log_input "新しい登録者名を入力してください: "
+    read -p "> " new_name
+    if [ -z "$new_name" ]; then
+        error_exit "登録者名は必須です"
+    fi
+    
+    log_input "新しい登録者メールアドレスを入力してください: "
+    read -p "> " new_email
+    if [ -z "$new_email" ]; then
+        error_exit "登録者メールアドレスは必須です"
+    fi
+    
+    log_input "新しい登録者電話番号を入力してください: "
+    read -p "> " new_phone
+    if [ -z "$new_phone" ]; then
+        error_exit "登録者電話番号は必須です"
+    fi
+    
+    # 設定ファイルの更新
+    sed -i "s|registrant_name = \".*\"|registrant_name = \"$new_name\"|" "$TERRAFORM_VARS_FILE"
+    sed -i "s|registrant_email = \".*\"|registrant_email = \"$new_email\"|" "$TERRAFORM_VARS_FILE"
+    sed -i "s|registrant_phone = \".*\"|registrant_phone = \"$new_phone\"|" "$TERRAFORM_VARS_FILE"
+    
+    log_info "登録者情報を更新しました"
+}
+
+# =============================================================================
+# メイン処理
+# =============================================================================
+
+main() {
+    # 共通初期化
+    init_common "$SCRIPT_NAME"
+    
+    # 引数の解析
+    local update_only=false
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --update-only)
+                update_only=true
+                shift
+                ;;
+            --help|-h)
+                usage
+                exit 0
+                ;;
+            *)
+                error_exit "不明なオプション: $1"
+                ;;
+        esac
+    done
+    
+    # 作業ディレクトリの確認
+    if [ ! -f "main.tf" ]; then
+        error_exit "Terraformディレクトリで実行してください"
+    fi
+    
+    # 環境変数からの設定読み込み
+    if [ -n "${DOMAIN_NAME:-}" ] && [ -n "${SNAPSHOT_DATE:-}" ] && [ -n "${SSH_ALLOWED_IP:-}" ]; then
+        log_info "環境変数から設定を読み込みます"
+        local register_domain
+        register_domain=$(check_existing_domain "$DOMAIN_NAME")
+        
+        save_config \
+            "$DOMAIN_NAME" \
+            "$SNAPSHOT_DATE" \
+            "$SSH_ALLOWED_IP" \
+            "${VALIDATION_ENABLED:-N}" \
+            "${REGISTRANT_NAME:-}" \
+            "${REGISTRANT_EMAIL:-}" \
+            "${REGISTRANT_PHONE:-}" \
+            "$register_domain"
+    elif [ "$update_only" = true ]; then
         update_existing_config
     else
-        # 新規設定モード
         interactive_input
-        generate_config "$domain_name" "$snapshot_date" "$ssh_allowed_cidr" "$enable_validation_ec2" "$enable_validation_rds" "$first_name" "$last_name" "$organization_name" "$email" "$phone_number" "$address_line_1" "$city" "$state" "$country_code" "$zip_code" "$register_domain"
     fi
     
-    log_info "設定完了"
-    echo ""
-    log_info "次のコマンドでTerraformを実行できます:"
-    echo "  terraform plan"
-    echo "  terraform apply"
-    echo ""
-    log_warn "注意: 本番環境では必ずSSH許可IPを特定のIPに制限してください"
+    finish_script "$SCRIPT_NAME" 0
 }
 
-# スクリプト実行時の処理
+# スクリプト実行
 main "$@" 

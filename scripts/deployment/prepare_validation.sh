@@ -31,6 +31,7 @@ PROD_RDS_ID=$(jq -r '.production.rds_identifier' "$CONFIG_FILE")
 VALID_EC2_ID=$(jq -r '.validation.ec2_instance_id' "$CONFIG_FILE")
 VALID_RDS_ID=$(jq -r '.validation.rds_identifier' "$CONFIG_FILE")
 VALID_WP_URL=$(jq -r '.validation.wordpress_url' "$CONFIG_FILE")
+VALID_DB_PASSWORD=$(jq -r '.validation.db_password' "$CONFIG_FILE")
 
 # 設定の検証
 if [ "$PROD_EC2_ID" = "null" ] || [ "$PROD_EC2_ID" = "" ]; then
@@ -115,7 +116,7 @@ fi
 # データベース接続確認
 log "データベース接続確認中..."
 VALID_RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier "$VALID_RDS_ID" --query 'DBInstances[0].Endpoint.Address' --output text)
-if mysql -h "$VALID_RDS_ENDPOINT" -u admin -p"breadhouse" -e "SELECT 1;" 2>/dev/null; then
+if mysql -h "$VALID_RDS_ENDPOINT" -u admin -p"$VALID_DB_PASSWORD" -e "SELECT 1;" 2>/dev/null; then
     log "✓ データベース接続が正常です"
 else
     error_exit "✗ データベース接続に失敗しました"
