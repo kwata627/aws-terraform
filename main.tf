@@ -168,14 +168,40 @@ module "acm" {
 
 # Route53モジュール
 module "route53" {
-  source                        = "./modules/route53"
-  project                       = var.project
-  domain_name                   = var.domain_name
-  wordpress_ip                  = module.ec2.public_ip
-  # cloudfront_domain_name        = module.cloudfront.domain_name # 一時的に無効化
+  source = "./modules/route53"
+  
+  project = var.project
+  
+  # ドメイン設定
+  domain_name = var.domain_name
+  wordpress_ip = module.ec2.public_ip
+  # cloudfront_domain_name = module.cloudfront.domain_name # 一時的に無効化
   certificate_validation_records = module.acm.validation_records
-  registrant_info               = var.registrant_info
-  register_domain               = var.register_domain
+  
+  # ドメイン登録設定
+  register_domain = var.register_domain
+  registrant_info = var.registrant_info
+  
+  # セキュリティ設定
+  enable_dnssec = false  # 必要に応じて有効化
+  enable_query_logging = false  # 必要に応じて有効化
+  
+  # ヘルスチェック設定
+  enable_health_checks = false  # 必要に応じて有効化
+  
+  # プライベートホストゾーン設定
+  is_private_zone = false
+  private_zone_vpc_ids = []
+  
+  # 環境設定
+  environment = "production"
+  
+  # タグ設定
+  tags = {
+    Project     = var.project
+    Environment = "production"
+    ManagedBy   = "terraform"
+  }
   
   providers = {
     aws.us_east_1 = aws.us_east_1
