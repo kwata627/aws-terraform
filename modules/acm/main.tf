@@ -1,27 +1,80 @@
-# ----- ACM証明書の作成（HTTPS用） -----
+# =============================================================================
+# ACM Certificate Module
+# =============================================================================
+# 
+# このモジュールはAWS Certificate Manager (ACM) を使用してSSL/TLS証明書を
+# 作成し、HTTPS通信を有効にします。CloudFrontとの統合を考慮して
+# us-east-1リージョンでの証明書作成を想定しています。
+#
+# 特徴:
+# - DNS検証方式による証明書発行
+# - ワイルドカード証明書対応 (*.domain.com)
+# - 自動更新対応
+# - 適切なライフサイクル管理
+# =============================================================================
 
-# --- us-east-1リージョンのプロバイダー設定（CloudFront用） ---
-provider "aws" {
-  alias  = "us_east_1"
-  region = "us-east-1"
+# -----------------------------------------------------------------------------
+# Required Providers
+# -----------------------------------------------------------------------------
+
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 4.0.0"
+    }
+  }
 }
 
-# --- ACM証明書の作成 ---
+# -----------------------------------------------------------------------------
+# ACM Certificate Resource
+# -----------------------------------------------------------------------------
 resource "aws_acm_certificate" "main" {
-  provider = aws.us_east_1  # CloudFront用にus-east-1で作成
-  domain_name       = var.domain_name
-  validation_method = "DNS"
+  # CloudFrontとの統合のため、us-east-1リージョンでの作成が必要
+  # プロバイダーは呼び出し元で指定
+  provider = aws
+
+  # プライマリドメイン名
+  domain_name = var.domain_name
+
+  # DNS検証方式（推奨）
+  # - より安全で自動化しやすい
+  # - メール検証と比較して確実性が高い
+  validation_method = var.validation_method
 
   # サブジェクト代替名（SAN）の設定
-  subject_alternative_names = ["*.${var.domain_name}"]
+  # ワイルドカード証明書により、サブドメインもカバー
+  subject_alternative_names = local.final_san_list
 
-  # 証明書の有効期限の設定
+  # 証明書のライフサイクル管理
+  # create_before_destroy: 新しい証明書を作成してから古い証明書を削除
+  # これにより、証明書の更新時にダウンタイムを最小化
   lifecycle {
     create_before_destroy = true
   }
 
-  tags = {
-    Name = "${var.project}-certificate"
-  }
+  # リソースタグ
+  # プロジェクト管理、コスト管理、セキュリティ監査に活用
+  tags = merge(
+    {
+      Name        = "${var.project}-acm-certificate"
+      Environment = var.environment
+      Module      = "acm"
+      ManagedBy   = "terraform"
+    },
+    var.tags
+  )
 }
+
+# -----------------------------------------------------------------------------
+# Certificate Validation
+# -----------------------------------------------------------------------------
+# 
+# 証明書の検証は自動的に実行されますが、DNSレコードの設定が必要です。
+# 検証用のDNSレコード情報は outputs.tf で出力されます。
+#
+# 注意事項:
+# - DNSレコードの設定後、検証完了まで数分かかる場合があります
+# - 検証が完了するまで、証明書は使用できません
+# - 検証失敗時は、DNSレコードの設定を確認してください
 

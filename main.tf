@@ -79,6 +79,11 @@ module "acm" {
   source      = "./modules/acm"
   project     = var.project
   domain_name = var.domain_name
+  environment = "production"
+  
+  providers = {
+    aws = aws.us_east_1
+  }
 }
 
 # CloudFrontモジュール（一時的に無効化）
