@@ -18,7 +18,7 @@ enable_validation_rds = false   # 検証用RDS（停止状態で作成）
 ssh_allowed_cidr = "0.0.0.0/0"
 
 # ドメイン登録設定
-register_domain = false  # 既存ドメインのためfalseに設定
+register_domain = true  # 新規ドメインのためtrueに設定
 
 # ドメイン登録者情報
 registrant_info = {

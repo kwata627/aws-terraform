@@ -45,6 +45,49 @@ AWS上にTerraformを用いてWordPressブログ環境をIaCとして構築し�
   +-----------------------------------------------+
 ```
 
+## 統合管理スクリプト
+
+### 使用方法
+
+```bash
+# ヘルプ表示
+./manage.sh help
+
+# 設定ファイル生成
+./manage.sh config example.com 20250803
+
+# デプロイメント実行
+./manage.sh deploy production
+
+# 検証環境準備
+./manage.sh validate
+
+# 環境状況確認
+./manage.sh status
+
+# SSH許可IP更新
+./manage.sh ssh-update
+
+# ロールバック実行
+./manage.sh rollback
+
+# ログ確認
+./manage.sh logs
+```
+
+### コマンド一覧
+
+| コマンド | 説明 | 例 |
+|---------|------|-----|
+| `config <domain> <date>` | 設定ファイル生成 | `./manage.sh config example.com 20250803` |
+| `deploy [environment]` | デプロイメント実行 | `./manage.sh deploy production` |
+| `validate` | 検証環境準備 | `./manage.sh validate` |
+| `rollback` | ロールバック実行 | `./manage.sh rollback` |
+| `ssh-update` | SSH許可IP更新 | `./manage.sh ssh-update` |
+| `logs` | ログ確認 | `./manage.sh logs` |
+| `status` | 環境状況確認 | `./manage.sh status` |
+| `help` | ヘルプ表示 | `./manage.sh help` |
+
 ## 構成の意図と工夫した点
 
 ### 1. ネットワーク基盤の設計
@@ -145,12 +188,11 @@ AWS上にTerraformを用いてWordPressブログ環境をIaCとして構築し�
 
 ### 1. 初期セットアップ
 ```bash
+# 設定ファイル生成
+./manage.sh config your-domain.com 20250803
+
 # Terraformの初期化
 terraform init
-
-# 変数ファイルの設定
-cp terraform.tfvars.example terraform.tfvars
-# terraform.tfvarsを編集
 
 # インフラの構築
 terraform plan
@@ -168,10 +210,10 @@ ansible-playbook playbooks/wordpress_setup.yml
 ### 3. 自動デプロイメント
 ```bash
 # デプロイメントシステムの初期化
-./scripts/setup_deployment.sh
+./manage.sh validate
 
 # 自動デプロイメントの実行
-./scripts/auto_deployment.sh
+./manage.sh deploy production
 ```
 
 ## 技術スタック

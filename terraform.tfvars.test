@@ -1,0 +1,32 @@
+aws_region = "ap-northeast-1"
+aws_profile = "default"
+
+# ドメイン設定
+domain_name = "new-test-domain-20250804.com"
+
+# スナップショット設定
+snapshot_date = "20250804"
+
+# 検証環境の設定
+enable_validation_ec2 = true    # 検証用EC2（停止状態で作成）
+enable_validation_rds = false   # 検証用RDS（停止状態で作成）
+
+# SSH接続許可IP（セキュリティ強化）
+ssh_allowed_cidr = "0.0.0.0/0"
+
+# ドメイン登録設定
+register_domain = false  # ドメイン登録をスキップ
+
+# ドメイン登録者情報
+registrant_info = {
+  first_name        = "Test"
+  last_name         = "User"
+  organization_name = "Test Organization"
+  email            = "test@example.com"
+  phone_number     = "+81.1234567890"
+  address_line_1   = "123 Test Street"
+  city             = "Tokyo"
+  state            = "Tokyo"
+  country_code     = "JP"
+  zip_code         = "100-0001"
+}

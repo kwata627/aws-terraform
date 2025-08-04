@@ -44,3 +44,14 @@ output "validation_private_ip" {
   description = "検証用EC2インスタンスのプライベートIP"
   value       = module.ec2.validation_private_ip
 }
+
+# ドメイン登録情報
+output "domain_registration_status" {
+  description = "ドメイン登録の状態"
+  value       = module.route53.domain_registration_status
+}
+
+output "domain_expiration_date" {
+  description = "ドメインの有効期限"
+  value       = module.route53.domain_expiration_date
+}

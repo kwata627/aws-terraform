@@ -97,4 +97,10 @@ module "route53" {
   wordpress_ip                  = module.ec2.public_ip
   # cloudfront_domain_name        = module.cloudfront.domain_name # 一時的に無効化
   certificate_validation_records = module.acm.validation_records
+  registrant_info               = var.registrant_info
+  register_domain               = var.register_domain
+  
+  providers = {
+    aws.us_east_1 = aws.us_east_1
+  }
 }

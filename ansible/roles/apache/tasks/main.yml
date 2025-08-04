@@ -30,10 +30,13 @@
     group: apache
   become: yes
 
-- name: Remove default index.html if exists
-  file:
-    path: /var/www/html/index.html
-    state: absent
+- name: Create index.html for testing
+  copy:
+    content: "<html><body><h1>Apache is working!</h1></body></html>"
+    dest: /var/www/html/index.html
+    mode: '0644'
+    owner: apache
+    group: apache
   become: yes
 
 - name: Enable and start Apache service

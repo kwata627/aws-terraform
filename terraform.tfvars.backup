@@ -1,0 +1,19 @@
+aws_region = "ap-northeast-1"
+aws_profile = "default"
+# SSH公開鍵は自動生成されるため削除
+
+# ドメイン設定
+domain_name = "shamonooyuuhan.com"
+
+# スナップショット設定
+snapshot_date = "20250803"
+
+# 検証環境の設定
+enable_validation_ec2 = true    # 検証用EC2（停止状態で作成）
+enable_validation_rds = true    # 検証用RDS（停止状態で作成）
+
+# SSH接続許可IP（セキュリティ強化）
+# 例: "203.0.113.0/24"  # 特定のIPレンジ
+# 例: "192.168.1.0/24"   # ローカルネットワーク
+# 注意: 本番環境では必ず特定IPに制限してください
+ssh_allowed_cidr = "0.0.0.0/0"  # 現在は全世界から許可

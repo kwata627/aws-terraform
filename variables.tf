@@ -116,3 +116,44 @@ variable "validation_rds_snapshot_identifier" {
   type        = string
   default     = ""
 }
+
+variable "ssh_allowed_cidr" {
+  description = "SSH接続を許可するCIDRブロック（例: 203.0.113.0/24）"
+  type        = string
+  default     = "0.0.0.0/0"  # 注意：本番環境では特定IPに制限
+}
+
+# ドメイン登録用の登録者情報
+variable "registrant_info" {
+  description = "ドメイン登録者の情報"
+  type = object({
+    first_name        = string
+    last_name         = string
+    organization_name = string
+    email            = string
+    phone_number     = string
+    address_line_1   = string
+    city             = string
+    state            = string
+    country_code     = string
+    zip_code         = string
+  })
+  default = {
+    first_name        = "Admin"
+    last_name         = "User"
+    organization_name = "My Organization"
+    email            = "admin@example.com"
+    phone_number     = "+81.1234567890"
+    address_line_1   = "123 Main Street"
+    city             = "Tokyo"
+    state            = "Tokyo"
+    country_code     = "JP"
+    zip_code         = "100-0001"
+  }
+}
+
+variable "register_domain" {
+  description = "ドメイン登録を実行するかどうか"
+  type        = bool
+  default     = true
+}
