@@ -34,11 +34,15 @@ module "network" {
     }
   ]
   
-  # プライベートサブネット設定
+  # プライベートサブネット設定（RDS用に2つ作成）
   private_subnets = [
     {
       cidr = var.private_subnet_cidr
       az   = var.az1
+    },
+    {
+      cidr = "10.0.3.0/24"  # 2番目のプライベートサブネット
+      az   = "ap-northeast-1c"  # 異なるAZ
     }
   ]
   
@@ -90,15 +94,48 @@ module "ec2" {
 
 # RDSモジュール
 module "rds" {
-  source                  = "./modules/rds"
-  project                 = var.project
-  private_subnet_ids      = module.network.private_subnet_ids
-  rds_security_group_id   = module.security.rds_sg_id
-  db_password             = var.db_password
-  snapshot_date           = var.snapshot_date
-  rds_identifier          = var.rds_identifier
-  enable_validation_rds   = var.enable_validation_rds
+  source = "./modules/rds"
+  
+  project = var.project
+  
+  # ネットワーク設定
+  private_subnet_ids = module.network.private_subnet_ids
+  rds_security_group_id = module.security.rds_sg_id
+  
+  # データベース設定
+  db_password = var.db_password
+  snapshot_date = var.snapshot_date
+  rds_identifier = var.rds_identifier
+  
+  # セキュリティ設定
+  deletion_protection = false  # 必要に応じて有効化
+  storage_encrypted = true
+  publicly_accessible = false
+  multi_az = false  # 必要に応じて有効化
+  
+  # バックアップ設定
+  backup_retention_period = 7
+  backup_window = "03:00-04:00"
+  maintenance_window = "sun:04:00-sun:05:00"
+  
+  # 監視・ログ設定
+  enable_cloudwatch_logs = false     # 必要に応じて有効化
+  enable_performance_insights = false # 必要に応じて有効化
+  enable_enhanced_monitoring = false # 必要に応じて有効化
+  
+  # 検証環境設定
+  enable_validation_rds = var.enable_validation_rds
   validation_rds_snapshot_identifier = var.validation_rds_snapshot_identifier
+  
+  # 環境設定
+  environment = "production"
+  
+  # タグ設定
+  tags = {
+    Project     = var.project
+    Environment = "production"
+    ManagedBy   = "terraform"
+  }
 }
 
 # S3モジュール
