@@ -1,0 +1,397 @@
+name: Rollback Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      snapshot_id:
+        description: 'Snapshot ID to rollback to (leave empty for latest)'
+        required: false
+        type: string
+      auto_approve:
+        description: 'Auto approve rollback'
+        required: false
+        default: false
+        type: boolean
+      force_rollback:
+        description: 'Force rollback even if tests fail'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  ANSIBLE_HOST_KEY_CHECKING: false
+  ANSIBLE_FORCE_COLOR: true
+
+jobs:
+  pre-rollback-checks:
+    runs-on: ubuntu-latest
+    name: Pre-rollback Checks
+    outputs:
+      snapshot_id: ${{ steps.get_snapshot.outputs.snapshot_id }}
+      
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION || 'ap-northeast-1' }}
+        
+    - name: Get snapshot ID
+      id: get_snapshot
+      run: |
+        if [ -n "${{ github.event.inputs.snapshot_id }}" ]; then
+          SNAPSHOT_ID="${{ github.event.inputs.snapshot_id }}"
+        else
+          # Get the latest snapshot
+          if [ -n "${{ secrets.PRODUCTION_RDS_ID }}" ]; then
+            SNAPSHOT_ID=$(aws rds describe-db-snapshots \
+              --db-instance-identifier ${{ secrets.PRODUCTION_RDS_ID }} \
+              --query 'DBSnapshots[?Status==`available`] | sort_by(@, &SnapshotCreateTime) | [-1].DBSnapshotIdentifier' \
+              --output text)
+          else
+            echo "Error: PRODUCTION_RDS_ID not set"
+            exit 1
+          fi
+        fi
+        
+        echo "snapshot_id=$SNAPSHOT_ID" >> $GITHUB_OUTPUT
+        echo "✅ Using snapshot: $SNAPSHOT_ID"
+        
+    - name: Verify snapshot exists
+      run: |
+        if [ -n "${{ steps.get_snapshot.outputs.snapshot_id }}" ]; then
+          aws rds describe-db-snapshots \
+            --db-snapshot-identifier ${{ steps.get_snapshot.outputs.snapshot_id }} \
+            --query 'DBSnapshots[0].Status' \
+            --output text
+          
+          if [ $? -ne 0 ]; then
+            echo "❌ Snapshot not found or not available"
+            exit 1
+          fi
+        else
+          echo "Error: Snapshot ID not available"
+          exit 1
+        fi
+        
+    - name: Check production environment status
+      run: |
+        # Check if production EC2 is running
+        if [ -n "${{ secrets.PRODUCTION_EC2_ID }}" ]; then
+          EC2_STATUS=$(aws ec2 describe-instances \
+            --instance-ids ${{ secrets.PRODUCTION_EC2_ID }} \
+            --query 'Reservations[0].Instances[0].State.Name' \
+            --output text)
+          
+          if [ "$EC2_STATUS" != "running" ]; then
+            echo "❌ Production EC2 instance is not running"
+            exit 1
+          fi
+        else
+          echo "Warning: PRODUCTION_EC2_ID not set"
+        fi
+        
+        # Check if production RDS is available
+        if [ -n "${{ secrets.PRODUCTION_RDS_ID }}" ]; then
+          RDS_STATUS=$(aws rds describe-db-instances \
+            --db-instance-identifier ${{ secrets.PRODUCTION_RDS_ID }} \
+            --query 'DBInstances[0].DBInstanceStatus' \
+            --output text)
+          
+          if [ "$RDS_STATUS" != "available" ]; then
+            echo "❌ Production RDS instance is not available"
+            exit 1
+          fi
+        else
+          echo "Error: PRODUCTION_RDS_ID not set"
+          exit 1
+        fi
+
+  create-backup:
+    needs: pre-rollback-checks
+    runs-on: ubuntu-latest
+    name: Create Backup Before Rollback
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION || 'ap-northeast-1' }}
+        
+    - name: Create backup snapshot
+      id: backup
+      run: |
+        if [ -n "${{ secrets.PRODUCTION_RDS_ID }}" ]; then
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          BACKUP_ID="rollback-backup-$TIMESTAMP"
+          
+          aws rds create-db-snapshot \
+            --db-instance-identifier ${{ secrets.PRODUCTION_RDS_ID }} \
+            --db-snapshot-identifier "$BACKUP_ID"
+          
+          echo "backup_id=$BACKUP_ID" >> $GITHUB_OUTPUT
+          echo "✅ Created backup: $BACKUP_ID"
+        else
+          echo "Error: PRODUCTION_RDS_ID not set"
+          exit 1
+        fi
+        
+    - name: Wait for backup completion
+      run: |
+        if [ -n "${{ needs.create-backup.outputs.backup_id }}" ]; then
+          aws rds wait db-snapshot-completed \
+            --db-snapshot-identifier ${{ needs.create-backup.outputs.backup_id }}
+          echo "✅ Backup completed"
+        else
+          echo "Error: Backup ID not available"
+          exit 1
+        fi
+
+  manual-approval:
+    needs: [pre-rollback-checks, create-backup]
+    if: ${{ github.event.inputs.auto_approve != 'true' }}
+    runs-on: ubuntu-latest
+    name: Manual Approval for Rollback
+    
+    steps:
+    - name: Request rollback approval
+      uses: trstringer/manual-approval@v1
+      with:
+        secret: ${{ secrets.ROLLBACK_APPROVAL_SECRET }}
+        approvers: ${{ secrets.ROLLBACK_APPROVERS || 'admin' }}
+        minimum-approvals: 1
+        exclude-workflow-initiator-as-approver: false
+
+  execute-rollback:
+    needs: [pre-rollback-checks, create-backup, manual-approval]
+    if: ${{ github.event.inputs.auto_approve == 'true' || needs.manual-approval.result == 'approved' }}
+    runs-on: ubuntu-latest
+    name: Execute Rollback
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install ansible boto3 pyyaml
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION || 'ap-northeast-1' }}
+        
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        
+    - name: Generate inventory
+      working-directory: ./ansible
+      run: |
+        if [ -f "generate_inventory.py" ]; then
+          python3 generate_inventory.py --environment production
+        else
+          echo "Warning: generate_inventory.py not found"
+        fi
+        
+    - name: Stop WordPress services
+      working-directory: ./ansible
+      run: |
+        if [ -f "inventory/hosts.yml" ]; then
+          # Stop Apache to prevent data corruption
+          ansible wordpress -i inventory/hosts.yml -m service \
+            -a "name=httpd state=stopped" --become
+        else
+          echo "Warning: inventory/hosts.yml not found"
+        fi
+        
+    - name: Restore RDS from snapshot
+      run: |
+        if [ -n "${{ secrets.PRODUCTION_RDS_ID }}" ] && [ -n "${{ needs.pre-rollback-checks.outputs.snapshot_id }}" ]; then
+          # Stop the current RDS instance
+          aws rds stop-db-instance \
+            --db-instance-identifier ${{ secrets.PRODUCTION_RDS_ID }}
+          
+          # Wait for RDS to stop
+          aws rds wait db-instance-stopped \
+            --db-instance-identifier ${{ secrets.PRODUCTION_RDS_ID }}
+          
+          # Restore from snapshot
+          aws rds restore-db-instance-from-db-snapshot \
+            --db-instance-identifier "${{ secrets.PRODUCTION_RDS_ID }}" \
+            --db-snapshot-identifier "${{ needs.pre-rollback-checks.outputs.snapshot_id }}" \
+            --db-instance-class db.t3.micro
+          
+          echo "✅ Started RDS restoration from snapshot"
+        else
+          echo "Error: PRODUCTION_RDS_ID or snapshot not available"
+          exit 1
+        fi
+        
+    - name: Wait for RDS restoration
+      run: |
+        if [ -n "${{ secrets.PRODUCTION_RDS_ID }}" ]; then
+          # Wait for RDS to be available
+          aws rds wait db-instance-available \
+            --db-instance-identifier ${{ secrets.PRODUCTION_RDS_ID }}
+          echo "✅ RDS restoration completed"
+        else
+          echo "Error: PRODUCTION_RDS_ID not set"
+          exit 1
+        fi
+        
+    - name: Start WordPress services
+      working-directory: ./ansible
+      run: |
+        if [ -f "inventory/hosts.yml" ]; then
+          # Start Apache
+          ansible wordpress -i inventory/hosts.yml -m service \
+            -a "name=httpd state=started" --become
+          
+          # Restart MySQL if needed
+          ansible wordpress -i inventory/hosts.yml -m service \
+            -a "name=mysqld state=restarted" --become
+        else
+          echo "Warning: inventory/hosts.yml not found"
+        fi
+
+  test-rollback:
+    needs: execute-rollback
+    runs-on: ubuntu-latest
+    name: Test Rollback
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install ansible boto3 pyyaml
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION || 'ap-northeast-1' }}
+        
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        
+    - name: Generate inventory
+      working-directory: ./ansible
+      run: |
+        if [ -f "generate_inventory.py" ]; then
+          python3 generate_inventory.py --environment production
+        else
+          echo "Warning: generate_inventory.py not found"
+        fi
+        
+    - name: Test WordPress site
+      working-directory: ./ansible
+      run: |
+        if [ -f "inventory/hosts.yml" ]; then
+          # Get production IP
+          PRODUCTION_IP=$(ansible wordpress -i inventory/hosts.yml -m setup -a "filter=ansible_default_ipv4" | grep "address" | head -1 | awk '{print $2}' | tr -d '"')
+          
+          # Wait for WordPress to be ready
+          for i in {1..30}; do
+            if [ -n "$PRODUCTION_IP" ] && curl -f -s -o /dev/null --max-time 10 "http://$PRODUCTION_IP"; then
+              echo "✅ WordPress site is accessible after rollback"
+              break
+            fi
+            echo "Waiting for WordPress to be ready... ($i/30)"
+            sleep 10
+          done
+          
+          # Test admin panel
+          if [ -n "$PRODUCTION_IP" ] && curl -f -s -o /dev/null --max-time 10 "http://$PRODUCTION_IP/wp-admin"; then
+            echo "✅ WordPress admin panel is accessible after rollback"
+          else
+            echo "❌ WordPress admin panel is not accessible after rollback"
+            if [ "${{ github.event.inputs.force_rollback }}" != "true" ]; then
+              exit 1
+            fi
+          fi
+        else
+          echo "Warning: inventory/hosts.yml not found, skipping WordPress test"
+        fi
+        
+    - name: Test database connection
+      working-directory: ./ansible
+      run: |
+        if [ -f "inventory/hosts.yml" ]; then
+          # Test database connectivity
+          ansible wordpress -i inventory/hosts.yml -m mysql_query \
+            -a "login_db=wordpress query='SELECT 1;'" \
+            --become
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Database connection successful after rollback"
+          else
+            echo "❌ Database connection failed after rollback"
+            if [ "${{ github.event.inputs.force_rollback }}" != "true" ]; then
+              exit 1
+            fi
+          fi
+        else
+          echo "Warning: inventory/hosts.yml not found, skipping database test"
+        fi
+
+  rollback-summary:
+    needs: [execute-rollback, test-rollback]
+    if: always()
+    runs-on: ubuntu-latest
+    name: Rollback Summary
+    
+    steps:
+    - name: Create summary
+      run: |
+        echo "## Rollback Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- Rollback Snapshot: ${{ needs.pre-rollback-checks.outputs.snapshot_id }}"
+        echo "- Backup Created: ${{ needs.create-backup.outputs.backup_id }}"
+        echo "- Status: ✅ Rollback completed successfully"
+        echo ""
+        echo "### Access Information"
+        if [ -n "${{ secrets.PRODUCTION_WORDPRESS_URL }}" ]; then
+          echo "- Production Site: ${{ secrets.PRODUCTION_WORDPRESS_URL }}"
+          echo "- Admin Panel: ${{ secrets.PRODUCTION_WORDPRESS_URL }}/wp-admin"
+        else
+          echo "- Production URL: Not configured"
+        fi
+        echo ""
+        echo "### Recovery Information"
+        echo "- If rollback was successful, the backup can be deleted"
+        echo "- If rollback failed, use the backup to restore: ${{ needs.create-backup.outputs.backup_id }}"
+        
+    - name: Upload rollback logs
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: rollback-logs
+        path: |
+          ansible/logs/
+          ~/.ansible/
+        retention-days: 30 

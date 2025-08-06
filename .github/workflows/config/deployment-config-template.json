@@ -1,0 +1,36 @@
+{
+    "production": {
+        "ec2_instance_id": "",
+        "rds_identifier": "wp-shamo-rds",
+        "wordpress_url": "http://shamonooyuuhan.com",
+        "backup_retention_days": 7,
+        "ssh_user": "ubuntu",
+        "ssh_key_path": "~/.ssh/id_rsa"
+    },
+    "validation": {
+        "ec2_instance_id": "",
+        "rds_identifier": "wp-shamo-rds-validation",
+        "wordpress_url": "http://validation-ip",
+        "test_timeout_minutes": 30,
+        "ssh_user": "ubuntu",
+        "ssh_key_path": "~/.ssh/id_rsa"
+    },
+    "deployment": {
+        "auto_approve": false,
+        "rollback_on_failure": true,
+        "notification_email": "",
+        "backup_before_deployment": true,
+        "test_validation_environment": true,
+        "stop_validation_after_deployment": true
+    },
+    "aws": {
+        "region": "ap-northeast-1",
+        "profile": "default",
+        "max_retries": 3
+    },
+    "github": {
+        "repository": "owner/repo",
+        "branch": "main",
+        "workflow_id": "wordpress-deployment.yml"
+    }
+} 

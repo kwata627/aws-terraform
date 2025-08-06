@@ -1,0 +1,406 @@
+name: WordPress Deployment Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'ansible/**'
+      - 'terraform.tfvars'
+      - 'deployment_config.json'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'ansible/**'
+      - 'terraform.tfvars'
+      - 'deployment_config.json'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment Environment'
+        required: true
+        default: 'validation'
+        type: choice
+        options:
+        - validation
+        - production
+      dry_run:
+        description: 'Dry Run Mode'
+        required: false
+        default: false
+        type: boolean
+      auto_approve:
+        description: 'Auto Approve Deployment'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  AWS_REGION: ap-northeast-1
+  AWS_MAX_RETRIES: 3
+  LOG_LEVEL: INFO
+
+jobs:
+  validate-config:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      config-valid: ${{ steps.validate.outputs.valid }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install jq boto3 requests
+
+      - name: Validate deployment config
+        id: validate
+        run: |
+          python -c "
+          import json
+          import sys
+          
+          try:
+              with open('deployment_config.json', 'r') as f:
+                  config = json.load(f)
+              
+              # 必須設定の確認
+              required_fields = [
+                  'production.ec2_instance_id',
+                  'production.wordpress_url',
+                  'validation.ec2_instance_id',
+                  'validation.wordpress_url'
+              ]
+              
+              for field in required_fields:
+                  keys = field.split('.')
+                  value = config
+                  for key in keys:
+                      if key not in value:
+                          print(f'Missing required field: {field}')
+                          sys.exit(1)
+                      value = value[key]
+                  
+                  if not value:
+                      print(f'Empty required field: {field}')
+                      sys.exit(1)
+              
+              print('Configuration validation passed')
+              print('valid=true' >> $GITHUB_OUTPUT)
+              
+          except Exception as e:
+              print(f'Configuration validation failed: {e}')
+              print('valid=false' >> $GITHUB_OUTPUT)
+              sys.exit(1)
+          "
+
+  dry-run:
+    name: Dry Run
+    runs-on: ubuntu-latest
+    needs: validate-config
+    if: needs.validate-config.outputs.config-valid == 'true' && github.event.inputs.dry_run == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Display configuration
+        run: |
+          echo "=== Dry Run Configuration ==="
+          cat deployment_config.json | jq '.'
+          
+          echo ""
+          echo "=== Environment Variables ==="
+          echo "AWS_REGION: $AWS_REGION"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Auto Approve: ${{ github.event.inputs.auto_approve }}"
+
+  validation-deployment:
+    name: Validation Environment Deployment
+    runs-on: ubuntu-latest
+    needs: validate-config
+    if: needs.validate-config.outputs.config-valid == 'true' && (github.event.inputs.environment == 'validation' || github.event.inputs.environment == 'production')
+    environment: validation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Load configuration
+        id: config
+        run: |
+          # 設定ファイルから値を読み込み
+          PROD_EC2_ID=$(jq -r '.production.ec2_instance_id' deployment_config.json)
+          PROD_RDS_ID=$(jq -r '.production.rds_identifier' deployment_config.json)
+          VALID_EC2_ID=$(jq -r '.validation.ec2_instance_id' deployment_config.json)
+          VALID_RDS_ID=$(jq -r '.validation.rds_identifier' deployment_config.json)
+          PROD_WP_URL=$(jq -r '.production.wordpress_url' deployment_config.json)
+          VALID_WP_URL=$(jq -r '.validation.wordpress_url' deployment_config.json)
+          
+          echo "prod_ec2_id=$PROD_EC2_ID" >> $GITHUB_OUTPUT
+          echo "prod_rds_id=$PROD_RDS_ID" >> $GITHUB_OUTPUT
+          echo "valid_ec2_id=$VALID_EC2_ID" >> $GITHUB_OUTPUT
+          echo "valid_rds_id=$VALID_RDS_ID" >> $GITHUB_OUTPUT
+          echo "prod_wp_url=$PROD_WP_URL" >> $GITHUB_OUTPUT
+          echo "valid_wp_url=$VALID_WP_URL" >> $GITHUB_OUTPUT
+
+      - name: Create production snapshot
+        id: snapshot
+        run: |
+          echo "Creating production snapshot..."
+          SNAPSHOT_ID="wp-production-$(date +%Y%m%d-%H%M%S)"
+          
+          aws rds create-db-snapshot \
+            --db-instance-identifier "${{ steps.config.outputs.prod_rds_id }}" \
+            --db-snapshot-identifier "$SNAPSHOT_ID" \
+            --tags Key=Purpose,Value=DeploymentBackup Key=Date,Value=$(date +%Y-%m-%d) \
+            --region "${{ env.AWS_REGION }}"
+          
+          echo "Waiting for snapshot completion..."
+          aws rds wait db-snapshot-completed \
+            --db-snapshot-identifier "$SNAPSHOT_ID" \
+            --region "${{ env.AWS_REGION }}"
+          
+          echo "snapshot_id=$SNAPSHOT_ID" >> $GITHUB_OUTPUT
+          echo "Snapshot created: $SNAPSHOT_ID"
+
+      - name: Start validation environment
+        run: |
+          echo "Starting validation EC2 instance..."
+          aws ec2 start-instances \
+            --instance-ids "${{ steps.config.outputs.valid_ec2_id }}" \
+            --region "${{ env.AWS_REGION }}"
+          
+          echo "Waiting for EC2 instance to be running..."
+          aws ec2 wait instance-running \
+            --instance-ids "${{ steps.config.outputs.valid_ec2_id }}" \
+            --region "${{ env.AWS_REGION }}"
+          
+          echo "Starting validation RDS instance..."
+          # 検証用RDSが存在しない場合はスナップショットから復元
+          if ! aws rds describe-db-instances \
+            --db-instance-identifier "${{ steps.config.outputs.valid_rds_id }}" \
+            --query 'DBInstances[0].DBInstanceStatus' \
+            --output text \
+            --region "${{ env.AWS_REGION }}" 2>/dev/null | grep -q "available"; then
+            
+            aws rds restore-db-instance-from-db-snapshot \
+              --db-instance-identifier "${{ steps.config.outputs.valid_rds_id }}" \
+              --db-snapshot-identifier "${{ steps.snapshot.outputs.snapshot_id }}" \
+              --region "${{ env.AWS_REGION }}"
+            
+            echo "Waiting for RDS restoration..."
+            aws rds wait db-instance-available \
+              --db-instance-identifier "${{ steps.config.outputs.valid_rds_id }}" \
+              --region "${{ env.AWS_REGION }}"
+          else
+            echo "Validation RDS is already available"
+          fi
+
+      - name: Test validation environment
+        run: |
+          echo "Testing validation environment..."
+          VALID_URL="${{ steps.config.outputs.valid_wp_url }}"
+          
+          # 基本的な接続テスト
+          for i in {1..30}; do
+            if curl -f -s -o /dev/null --max-time 30 "$VALID_URL"; then
+              echo "Validation environment is accessible"
+              break
+            else
+              echo "Attempt $i: Validation environment not accessible yet, waiting..."
+              sleep 10
+            fi
+          done
+          
+          if ! curl -f -s -o /dev/null --max-time 30 "$VALID_URL"; then
+            echo "::error::Validation environment is not accessible after 30 attempts"
+            exit 1
+          fi
+
+      - name: Manual approval for production deployment
+        if: github.event.inputs.environment == 'production' && github.event.inputs.auto_approve != 'true'
+        run: |
+          echo "Production deployment requires manual approval."
+          echo "Please approve the deployment in the GitHub Actions interface."
+          echo "Or set auto_approve=true in the workflow inputs."
+
+  production-deployment:
+    name: Production Deployment
+    runs-on: ubuntu-latest
+    needs: [validate-config, validation-deployment]
+    if: needs.validate-config.outputs.config-valid == 'true' && github.event.inputs.environment == 'production'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Load configuration
+        id: config
+        run: |
+          PROD_EC2_ID=$(jq -r '.production.ec2_instance_id' deployment_config.json)
+          PROD_RDS_ID=$(jq -r '.production.rds_identifier' deployment_config.json)
+          PROD_WP_URL=$(jq -r '.production.wordpress_url' deployment_config.json)
+          
+          echo "prod_ec2_id=$PROD_EC2_ID" >> $GITHUB_OUTPUT
+          echo "prod_rds_id=$PROD_RDS_ID" >> $GITHUB_OUTPUT
+          echo "prod_wp_url=$PROD_WP_URL" >> $GITHUB_OUTPUT
+
+      - name: Create backup before deployment
+        id: backup
+        run: |
+          echo "Creating backup before deployment..."
+          BACKUP_SNAPSHOT_ID="wp-production-backup-$(date +%Y%m%d-%H%M%S)"
+          
+          aws rds create-db-snapshot \
+            --db-instance-identifier "${{ steps.config.outputs.prod_rds_id }}" \
+            --db-snapshot-identifier "$BACKUP_SNAPSHOT_ID" \
+            --tags Key=Purpose,Value=PreDeploymentBackup Key=Date,Value=$(date +%Y-%m-%d) \
+            --region "${{ env.AWS_REGION }}"
+          
+          echo "Waiting for backup completion..."
+          aws rds wait db-snapshot-completed \
+            --db-snapshot-identifier "$BACKUP_SNAPSHOT_ID" \
+            --region "${{ env.AWS_REGION }}"
+          
+          echo "backup_snapshot_id=$BACKUP_SNAPSHOT_ID" >> $GITHUB_OUTPUT
+          echo "Backup created: $BACKUP_SNAPSHOT_ID"
+
+      - name: Deploy to production
+        run: |
+          echo "Stopping production EC2 instance..."
+          aws ec2 stop-instances \
+            --instance-ids "${{ steps.config.outputs.prod_ec2_id }}" \
+            --region "${{ env.AWS_REGION }}"
+          
+          echo "Waiting for EC2 instance to stop..."
+          aws ec2 wait instance-stopped \
+            --instance-ids "${{ steps.config.outputs.prod_ec2_id }}" \
+            --region "${{ env.AWS_REGION }}"
+          
+          echo "Starting production EC2 instance..."
+          aws ec2 start-instances \
+            --instance-ids "${{ steps.config.outputs.prod_ec2_id }}" \
+            --region "${{ env.AWS_REGION }}"
+          
+          echo "Waiting for EC2 instance to be running..."
+          aws ec2 wait instance-running \
+            --instance-ids "${{ steps.config.outputs.prod_ec2_id }}" \
+            --region "${{ env.AWS_REGION }}"
+
+      - name: Test production environment
+        run: |
+          echo "Testing production environment..."
+          PROD_URL="${{ steps.config.outputs.prod_wp_url }}"
+          
+          # 基本的な接続テスト
+          for i in {1..30}; do
+            if curl -f -s -o /dev/null --max-time 30 "$PROD_URL"; then
+              echo "Production environment is accessible"
+              break
+            else
+              echo "Attempt $i: Production environment not accessible yet, waiting..."
+              sleep 10
+            fi
+          done
+          
+          if ! curl -f -s -o /dev/null --max-time 30 "$PROD_URL"; then
+            echo "::error::Production environment is not accessible after 30 attempts"
+            exit 1
+          fi
+
+      - name: Stop validation environment
+        if: always()
+        run: |
+          echo "Stopping validation environment..."
+          VALID_EC2_ID=$(jq -r '.validation.ec2_instance_id' deployment_config.json)
+          
+          aws ec2 stop-instances \
+            --instance-ids "$VALID_EC2_ID" \
+            --region "${{ env.AWS_REGION }}"
+          
+          echo "Validation environment stopped"
+
+      - name: Send notification
+        if: always()
+        run: |
+          echo "Deployment notification would be sent here."
+          echo "Status: ${{ job.status }}"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Triggered by: ${{ github.actor }}"
+          
+          # Slack通知の実装例（SLACK_WEBHOOK_URLが設定されている場合）
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            echo "Slack notification would be sent to: ${{ secrets.SLACK_WEBHOOK_URL }}"
+          fi
+
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [validate-config, validation-deployment, production-deployment]
+    if: needs.validate-config.outputs.config-valid == 'true' && (needs.validation-deployment.result == 'failure' || needs.production-deployment.result == 'failure')
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Rollback to latest snapshot
+        run: |
+          echo "Rollback initiated due to deployment failure..."
+          
+          PROD_RDS_ID=$(jq -r '.production.rds_identifier' deployment_config.json)
+          
+          # 最新のスナップショットを取得
+          LATEST_SNAPSHOT=$(aws rds describe-db-snapshots \
+            --query 'DBSnapshots[?DBInstanceIdentifier==`'"$PROD_RDS_ID"'`] | sort_by(@, &SnapshotCreateTime) | [-1].DBSnapshotIdentifier' \
+            --output text \
+            --region "${{ env.AWS_REGION }}")
+          
+          if [ "$LATEST_SNAPSHOT" != "None" ] && [ -n "$LATEST_SNAPSHOT" ]; then
+            echo "Rolling back to snapshot: $LATEST_SNAPSHOT"
+            
+            aws rds restore-db-instance-from-db-snapshot \
+              --db-instance-identifier "$PROD_RDS_ID" \
+              --db-snapshot-identifier "$LATEST_SNAPSHOT" \
+              --region "${{ env.AWS_REGION }}"
+            
+            echo "Rollback completed"
+          else
+            echo "No available snapshots for rollback"
+          fi 

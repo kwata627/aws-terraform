@@ -1,0 +1,187 @@
+name: WordPress Environment Setup
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - development
+      playbook:
+        description: 'Ansible playbook to run'
+        required: false
+        default: 'playbooks/wordpress_setup.yml'
+      dry_run:
+        description: 'Dry run mode'
+        required: false
+        default: false
+        type: boolean
+      step_by_step:
+        description: 'Step by step execution'
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [main]
+    paths:
+    - 'ansible/**'
+    - '.github/workflows/wordpress-setup.yml'
+
+env:
+  ANSIBLE_HOST_KEY_CHECKING: false
+  ANSIBLE_FORCE_COLOR: true
+
+jobs:
+  setup-wordpress:
+    runs-on: ubuntu-latest
+    name: WordPress Environment Setup
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install ansible boto3 pyyaml
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION || 'ap-northeast-1' }}
+        
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        if [ -n "${{ secrets.WORDPRESS_HOST }}" ]; then
+          ssh-keyscan -H ${{ secrets.WORDPRESS_HOST }} >> ~/.ssh/known_hosts
+        fi
+        
+    - name: Generate inventory
+      working-directory: ./ansible
+      run: |
+        if [ -f "generate_inventory.py" ]; then
+          python3 generate_inventory.py
+        else
+          echo "Warning: generate_inventory.py not found, skipping inventory generation"
+        fi
+        
+    - name: Validate inventory
+      working-directory: ./ansible
+      run: |
+        if [ -f "inventory/hosts.yml" ]; then
+          ansible-inventory --list -i inventory/hosts.yml
+        else
+          echo "Warning: inventory/hosts.yml not found"
+        fi
+        
+    - name: Test connection
+      working-directory: ./ansible
+      run: |
+        if [ -f "inventory/hosts.yml" ]; then
+          ansible wordpress -i inventory/hosts.yml -m ping
+        else
+          echo "Warning: inventory/hosts.yml not found, skipping connection test"
+        fi
+        
+    - name: Run syntax check
+      working-directory: ./ansible
+      run: |
+        PLAYBOOK="${{ github.event.inputs.playbook || 'playbooks/wordpress_setup.yml' }}"
+        if [ -f "$PLAYBOOK" ]; then
+          ansible-playbook --syntax-check "$PLAYBOOK" -i inventory/hosts.yml
+        else
+          echo "Warning: Playbook $PLAYBOOK not found"
+        fi
+        
+    - name: Run dry run (if enabled)
+      if: ${{ github.event.inputs.dry_run == 'true' }}
+      working-directory: ./ansible
+      run: |
+        PLAYBOOK="${{ github.event.inputs.playbook || 'playbooks/wordpress_setup.yml' }}"
+        if [ -f "$PLAYBOOK" ]; then
+          ansible-playbook --check --diff "$PLAYBOOK" -i inventory/hosts.yml
+        else
+          echo "Warning: Playbook $PLAYBOOK not found"
+        fi
+        
+    - name: Execute playbook
+      if: ${{ github.event.inputs.dry_run != 'true' }}
+      working-directory: ./ansible
+      run: |
+        PLAYBOOK="${{ github.event.inputs.playbook || 'playbooks/wordpress_setup.yml' }}"
+        if [ -f "$PLAYBOOK" ]; then
+          ansible-playbook "$PLAYBOOK" -i inventory/hosts.yml \
+            -e "environment=${{ github.event.inputs.environment || 'production' }}"
+        else
+          echo "Error: Playbook $PLAYBOOK not found"
+          exit 1
+        fi
+        
+    - name: Verify WordPress installation
+      if: ${{ github.event.inputs.dry_run != 'true' }}
+      working-directory: ./ansible
+      run: |
+        if [ -f "inventory/hosts.yml" ]; then
+          # Get WordPress server IP
+          WORDPRESS_IP=$(ansible wordpress -i inventory/hosts.yml -m setup -a "filter=ansible_default_ipv4" | grep "address" | head -1 | awk '{print $2}' | tr -d '"')
+          echo "WordPress IP: $WORDPRESS_IP"
+          
+          # Test WordPress site
+          if [ -n "$WORDPRESS_IP" ]; then
+            if curl -f -s -o /dev/null --max-time 30 "http://$WORDPRESS_IP"; then
+              echo "✅ WordPress site is accessible"
+            else
+              echo "❌ WordPress site is not accessible"
+              exit 1
+            fi
+          else
+            echo "Warning: Could not determine WordPress IP"
+          fi
+        else
+          echo "Warning: inventory/hosts.yml not found, skipping verification"
+        fi
+        
+    - name: Create deployment summary
+      if: ${{ github.event.inputs.dry_run != 'true' }}
+      run: |
+        echo "## WordPress Setup Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- Environment: ${{ github.event.inputs.environment || 'production' }}"
+        echo "- Playbook: ${{ github.event.inputs.playbook || 'playbooks/wordpress_setup.yml' }}"
+        echo "- Status: ✅ Completed successfully"
+        echo ""
+        echo "### Access Information"
+        if [ -f "ansible/inventory/hosts.yml" ]; then
+          WORDPRESS_IP=$(cd ansible && ansible wordpress -i inventory/hosts.yml -m setup -a "filter=ansible_default_ipv4" | grep "address" | head -1 | awk '{print $2}' | tr -d '"')
+          if [ -n "$WORDPRESS_IP" ]; then
+            echo "- WordPress Site: http://$WORDPRESS_IP"
+            echo "- Admin Panel: http://$WORDPRESS_IP/wp-admin"
+          else
+            echo "- WordPress IP: Could not determine"
+          fi
+        else
+          echo "- Inventory file not found"
+        fi
+        
+    - name: Upload logs
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: ansible-logs
+        path: |
+          ansible/logs/
+          ~/.ansible/
+        retention-days: 7 

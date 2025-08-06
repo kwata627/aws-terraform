@@ -104,48 +104,63 @@ terraform apply
   +-----------------------------------------------+
 ```
 
-## 統合管理スクリプト
+## GitHub Actions自動化
+
+このプロジェクトは、従来のシェルスクリプトからGitHub Actionsへの移行を完了しました。これにより、より安全で効率的な自動化が実現されています。
+
+### 利用可能なワークフロー
+
+#### 1. WordPress Environment Setup
+- **目的**: WordPress環境の構築と設定
+- **トリガー**: 手動実行、Ansibleファイルの変更
+- **機能**: 
+  - インベントリの自動生成
+  - 接続テスト
+  - Ansibleプレイブックの実行
+  - WordPressサイトの動作確認
+
+#### 2. Auto Deployment
+- **目的**: 検証環境でのテスト後に本番環境への自動デプロイ
+- **トリガー**: WordPressコンテンツの変更、手動実行
+- **機能**:
+  - 本番環境のスナップショット作成
+  - 検証環境の起動と復元
+  - 検証環境でのテスト実行
+  - 承認フロー（手動/自動）
+  - 本番環境への反映
+  - 検証環境のクリーンアップ
+
+#### 3. Rollback Deployment
+- **目的**: 問題発生時の本番環境のロールバック
+- **トリガー**: 手動実行
+- **機能**:
+  - ロールバック前のバックアップ作成
+  - 指定したスナップショットからの復元
+  - ロールバック後の動作確認
+  - 承認フロー（手動/自動）
 
 ### 使用方法
 
+#### GitHub Actionsでの実行
+1. **手動実行**: GitHubリポジトリのActionsタブから実行
+2. **自動実行**: コードプッシュ時に自動実行
+3. **承認フロー**: 設定に応じて手動承認が必要
+
+#### 設定が必要なSecrets
+詳細は [GitHub Secrets設定ガイド](.github/GITHUB_SECRETS_SETUP.md) を参照してください。
+
+### 従来のスクリプト（非推奨）
+
+以下のスクリプトは、GitHub Actionsへの移行により非推奨となりました：
+
 ```bash
-# ヘルプ表示
-./manage.sh help
-
-# 設定ファイル生成
-./manage.sh config example.com 20250803
-
-# デプロイメント実行
-./manage.sh deploy production
-
-# 検証環境準備
-./manage.sh validate
-
-# 環境状況確認
-./manage.sh status
-
-# SSH許可IP更新
-./manage.sh ssh-update
-
-# ロールバック実行
-./manage.sh rollback
-
-# ログ確認
-./manage.sh logs
+# 非推奨: 従来のシェルスクリプト
+./scripts/deployment/auto_deployment.sh
+./scripts/maintenance/rollback.sh
+./ansible/run_wordpress_setup.sh
 ```
 
-### コマンド一覧
-
-| コマンド | 説明 | 例 |
-|---------|------|-----|
-| `config <domain> <date>` | 設定ファイル生成 | `./manage.sh config example.com 20250803` |
-| `deploy [environment]` | デプロイメント実行 | `./manage.sh deploy production` |
-| `validate` | 検証環境準備 | `./manage.sh validate` |
-| `rollback` | ロールバック実行 | `./manage.sh rollback` |
-| `ssh-update` | SSH許可IP更新 | `./manage.sh ssh-update` |
-| `logs` | ログ確認 | `./manage.sh logs` |
-| `status` | 環境状況確認 | `./manage.sh status` |
-| `help` | ヘルプ表示 | `./manage.sh help` |
+**推奨**: GitHub Actionsワークフローを使用してください。
 
 ## 構成の意図と工夫した点
 

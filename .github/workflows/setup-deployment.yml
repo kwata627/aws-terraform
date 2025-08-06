@@ -1,0 +1,235 @@
+name: Setup Deployment System
+
+on:
+  workflow_dispatch:
+    inputs:
+      domain_name:
+        description: 'Domain name for WordPress site'
+        required: true
+        type: string
+      snapshot_date:
+        description: 'Snapshot date (YYYYMMDD)'
+        required: false
+        type: string
+      ssh_allowed_ip:
+        description: 'SSH allowed IP address'
+        required: false
+        type: string
+      validation_enabled:
+        description: 'Enable validation environment'
+        required: false
+        default: true
+        type: boolean
+      registrant_name:
+        description: 'Domain registrant name'
+        required: false
+        type: string
+      registrant_email:
+        description: 'Domain registrant email'
+        required: false
+        type: string
+      registrant_phone:
+        description: 'Domain registrant phone'
+        required: false
+        type: string
+  push:
+    branches: [main]
+    paths:
+    - 'terraform/**'
+    - '.github/workflows/setup-deployment.yml'
+
+env:
+  AWS_REGION: ap-northeast-1
+
+jobs:
+  setup-deployment:
+    runs-on: ubuntu-latest
+    name: Setup Deployment System
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install boto3 pyyaml jq
+        
+    - name: Install additional tools
+      run: |
+        # Install jq
+        sudo apt-get update
+        sudo apt-get install -y jq
+        
+        # Install AWS CLI v2
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        sudo ./aws/install
+        rm -rf aws awscliv2.zip
+        
+        # Install MySQL client
+        sudo apt-get install -y mysql-client
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.5.0"
+        
+    - name: Initialize Terraform
+      working-directory: ./terraform
+      run: |
+        terraform init
+        
+    - name: Get Terraform outputs
+      id: terraform_outputs
+      working-directory: ./terraform
+      run: |
+        # Get production EC2 instance ID
+        PROD_EC2_ID=$(terraform output -raw wordpress_public_ip 2>/dev/null || echo "")
+        echo "prod_ec2_id=$PROD_EC2_ID" >> $GITHUB_OUTPUT
+        
+        # Get production RDS identifier
+        PROD_RDS_ID=$(terraform output -raw rds_endpoint 2>/dev/null || echo "")
+        echo "prod_rds_id=$PROD_RDS_ID" >> $GITHUB_OUTPUT
+        
+        # Get validation EC2 instance ID
+        VALID_EC2_ID=$(terraform output -raw validation_private_ip 2>/dev/null || echo "")
+        echo "valid_ec2_id=$VALID_EC2_ID" >> $GITHUB_OUTPUT
+        
+        echo "✅ Terraform outputs retrieved"
+        
+    - name: Generate deployment configuration
+      run: |
+        # Create deployment_config.json
+        cat > deployment_config.json << EOF
+        {
+            "production": {
+                "ec2_instance_id": "${{ steps.terraform_outputs.outputs.prod_ec2_id }}",
+                "rds_identifier": "wp-shamo-rds",
+                "wordpress_url": "https://${{ github.event.inputs.domain_name }}",
+                "backup_retention_days": 7,
+                "ssh_user": "ec2-user",
+                "ssh_key_path": "~/.ssh/id_rsa"
+            },
+            "validation": {
+                "ec2_instance_id": "${{ steps.terraform_outputs.outputs.valid_ec2_id }}",
+                "rds_identifier": "wp-shamo-rds-validation",
+                "wordpress_url": "http://validation-ip",
+                "test_timeout_minutes": 30,
+                "ssh_user": "ec2-user",
+                "ssh_key_path": "~/.ssh/id_rsa"
+            },
+            "deployment": {
+                "auto_approve": false,
+                "rollback_on_failure": true,
+                "notification_email": "${{ github.actor }}@users.noreply.github.com",
+                "backup_before_deployment": true,
+                "test_after_deployment": true
+            },
+            "aws": {
+                "region": "${{ env.AWS_REGION }}",
+                "profile": "default",
+                "max_retries": 3
+            }
+        }
+        EOF
+        
+        echo "✅ Deployment configuration generated"
+        
+    - name: Generate terraform.tfvars
+      run: |
+        # Create terraform.tfvars
+        cat > terraform.tfvars << EOF
+        # Domain configuration
+        domain_name = "${{ github.event.inputs.domain_name }}"
+        
+        # SSH configuration
+        ssh_allowed_cidr = "${{ github.event.inputs.ssh_allowed_ip || '0.0.0.0/0' }}"
+        
+        # Validation environment
+        validation_enabled = ${{ github.event.inputs.validation_enabled }}
+        
+        # Domain registration (if provided)
+        $([ -n "${{ github.event.inputs.registrant_name }}" ] && echo "registrant_name = \"${{ github.event.inputs.registrant_name }}\"")
+        $([ -n "${{ github.event.inputs.registrant_email }}" ] && echo "registrant_email = \"${{ github.event.inputs.registrant_email }}\"")
+        $([ -n "${{ github.event.inputs.registrant_phone }}" ] && echo "registrant_phone = \"${{ github.event.inputs.registrant_phone }}\"")
+        
+        # Database configuration
+        db_password = "breadhouse"
+        
+        # Instance configuration
+        instance_type = "t2.micro"
+        rds_instance_class = "db.t3.micro"
+        EOF
+        
+        echo "✅ Terraform variables generated"
+        
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        
+        # Test SSH key
+        if [ -n "${{ steps.terraform_outputs.outputs.prod_ec2_id }}" ]; then
+          echo "✅ SSH key configured"
+        else
+          echo "⚠️ SSH key configured but EC2 instance not available"
+        fi
+        
+    - name: Validate configuration
+      run: |
+        # Validate deployment_config.json
+        if jq empty deployment_config.json 2>/dev/null; then
+          echo "✅ deployment_config.json is valid JSON"
+        else
+          echo "❌ deployment_config.json is invalid JSON"
+          exit 1
+        fi
+        
+        # Validate terraform.tfvars
+        if [ -f "terraform.tfvars" ]; then
+          echo "✅ terraform.tfvars exists"
+        else
+          echo "❌ terraform.tfvars not found"
+          exit 1
+        fi
+        
+    - name: Create setup summary
+      run: |
+        echo "## Deployment System Setup Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- Domain Name: ${{ github.event.inputs.domain_name }}"
+        echo "- SSH Allowed IP: ${{ github.event.inputs.ssh_allowed_ip || '0.0.0.0/0' }}"
+        echo "- Validation Enabled: ${{ github.event.inputs.validation_enabled }}"
+        echo "- Status: ✅ Setup completed successfully"
+        echo ""
+        echo "### Generated Files"
+        echo "- deployment_config.json: Deployment configuration"
+        echo "- terraform.tfvars: Terraform variables"
+        echo ""
+        echo "### Next Steps"
+        echo "1. Review the generated configuration files"
+        echo "2. Apply Terraform configuration: \`terraform apply\`"
+        echo "3. Configure GitHub Secrets for deployment"
+        echo "4. Test the deployment workflow"
+        
+    - name: Upload configuration files
+      uses: actions/upload-artifact@v4
+      with:
+        name: deployment-config
+        path: |
+          deployment_config.json
+          terraform.tfvars
+        retention-days: 30 

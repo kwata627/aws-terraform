@@ -1,0 +1,402 @@
+name: Auto Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      auto_approve:
+        description: 'Auto approve deployment'
+        required: false
+        default: false
+        type: boolean
+      rollback_on_failure:
+        description: 'Rollback on failure'
+        required: false
+        default: true
+        type: boolean
+      backup_before_deployment:
+        description: 'Create backup before deployment'
+        required: false
+        default: true
+        type: boolean
+      test_after_deployment:
+        description: 'Test after deployment'
+        required: false
+        default: true
+        type: boolean
+  push:
+    branches: [main]
+    paths:
+    - 'wordpress/**'
+    - 'content/**'
+    - '.github/workflows/auto-deployment.yml'
+
+env:
+  ANSIBLE_HOST_KEY_CHECKING: false
+  ANSIBLE_FORCE_COLOR: true
+
+jobs:
+  pre-deployment-checks:
+    runs-on: ubuntu-latest
+    name: Pre-deployment Checks
+    outputs:
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+      
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Check for changes
+      id: check
+      run: |
+        # Check if there are changes in WordPress content
+        if [ "${{ github.event_name }}" = "push" ]; then
+          if git diff --name-only ${{ github.event.before }} ${{ github.event.after }} | grep -E "(wordpress/|content/)" > /dev/null; then
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            echo "✅ Changes detected in WordPress content"
+          else
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No changes in WordPress content"
+          fi
+        else
+          # For manual dispatch, always deploy
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+          echo "✅ Manual deployment triggered"
+        fi
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION || 'ap-northeast-1' }}
+        
+    - name: Verify AWS resources
+      run: |
+        # Check if production EC2 instance exists
+        if [ -n "${{ secrets.PRODUCTION_EC2_ID }}" ]; then
+          aws ec2 describe-instances --instance-ids ${{ secrets.PRODUCTION_EC2_ID }} --query 'Reservations[0].Instances[0].State.Name' --output text
+        else
+          echo "Warning: PRODUCTION_EC2_ID not set"
+        fi
+        
+        # Check if production RDS instance exists
+        if [ -n "${{ secrets.PRODUCTION_RDS_ID }}" ]; then
+          aws rds describe-db-instances --db-instance-identifier ${{ secrets.PRODUCTION_RDS_ID }} --query 'DBInstances[0].DBInstanceStatus' --output text
+        else
+          echo "Warning: PRODUCTION_RDS_ID not set"
+        fi
+
+  create-snapshot:
+    needs: pre-deployment-checks
+    if: needs.pre-deployment-checks.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    name: Create Production Snapshot
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION || 'ap-northeast-1' }}
+        
+    - name: Create RDS snapshot
+      id: snapshot
+      run: |
+        if [ -n "${{ secrets.PRODUCTION_RDS_ID }}" ]; then
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          SNAPSHOT_ID="deployment-snapshot-$TIMESTAMP"
+          
+          aws rds create-db-snapshot \
+            --db-instance-identifier ${{ secrets.PRODUCTION_RDS_ID }} \
+            --db-snapshot-identifier "$SNAPSHOT_ID"
+          
+          echo "snapshot_id=$SNAPSHOT_ID" >> $GITHUB_OUTPUT
+          echo "✅ Created snapshot: $SNAPSHOT_ID"
+        else
+          echo "Error: PRODUCTION_RDS_ID not set"
+          exit 1
+        fi
+        
+    - name: Wait for snapshot completion
+      run: |
+        if [ -n "${{ needs.create-snapshot.outputs.snapshot_id }}" ]; then
+          aws rds wait db-snapshot-completed \
+            --db-snapshot-identifier ${{ needs.create-snapshot.outputs.snapshot_id }}
+          echo "✅ Snapshot completed"
+        else
+          echo "Error: Snapshot ID not available"
+          exit 1
+        fi
+
+  prepare-validation-environment:
+    needs: [pre-deployment-checks, create-snapshot]
+    if: needs.pre-deployment-checks.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    name: Prepare Validation Environment
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION || 'ap-northeast-1' }}
+        
+    - name: Start validation EC2 instance
+      run: |
+        if [ -n "${{ secrets.VALIDATION_EC2_ID }}" ]; then
+          aws ec2 start-instances --instance-ids ${{ secrets.VALIDATION_EC2_ID }}
+          aws ec2 wait instance-running --instance-ids ${{ secrets.VALIDATION_EC2_ID }}
+          echo "✅ Validation EC2 instance started"
+        else
+          echo "Warning: VALIDATION_EC2_ID not set, skipping EC2 start"
+        fi
+        
+    - name: Restore RDS from snapshot
+      run: |
+        if [ -n "${{ secrets.VALIDATION_RDS_ID }}" ] && [ -n "${{ needs.create-snapshot.outputs.snapshot_id }}" ]; then
+          # Create validation RDS from snapshot
+          aws rds restore-db-instance-from-db-snapshot \
+            --db-instance-identifier "${{ secrets.VALIDATION_RDS_ID }}" \
+            --db-snapshot-identifier "${{ needs.create-snapshot.outputs.snapshot_id }}" \
+            --db-instance-class db.t3.micro \
+            --availability-zone ap-northeast-1a
+          
+          echo "✅ Started RDS restoration from snapshot"
+        else
+          echo "Warning: VALIDATION_RDS_ID or snapshot not available"
+        fi
+        
+    - name: Wait for validation environment
+      run: |
+        if [ -n "${{ secrets.VALIDATION_RDS_ID }}" ]; then
+          # Wait for RDS to be available
+          aws rds wait db-instance-available --db-instance-identifier "${{ secrets.VALIDATION_RDS_ID }}"
+          echo "✅ Validation RDS instance is available"
+        fi
+        
+        # Wait for EC2 to be ready
+        sleep 60
+        echo "✅ Validation environment is ready"
+
+  test-validation-environment:
+    needs: prepare-validation-environment
+    runs-on: ubuntu-latest
+    name: Test Validation Environment
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install ansible boto3 pyyaml
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION || 'ap-northeast-1' }}
+        
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        
+    - name: Generate validation inventory
+      working-directory: ./ansible
+      run: |
+        if [ -f "generate_inventory.py" ]; then
+          python3 generate_inventory.py --environment validation
+        else
+          echo "Warning: generate_inventory.py not found"
+        fi
+        
+    - name: Test validation environment
+      working-directory: ./ansible
+      run: |
+        if [ -f "inventory/hosts.yml" ]; then
+          # Test WordPress site
+          VALIDATION_IP=$(ansible wordpress -i inventory/hosts.yml -m setup -a "filter=ansible_default_ipv4" | grep "address" | head -1 | awk '{print $2}' | tr -d '"')
+          
+          # Wait for WordPress to be ready
+          for i in {1..30}; do
+            if [ -n "$VALIDATION_IP" ] && curl -f -s -o /dev/null --max-time 10 "http://$VALIDATION_IP"; then
+              echo "✅ WordPress validation site is accessible"
+              break
+            fi
+            echo "Waiting for WordPress to be ready... ($i/30)"
+            sleep 10
+          done
+          
+          # Test admin panel
+          if [ -n "$VALIDATION_IP" ] && curl -f -s -o /dev/null --max-time 10 "http://$VALIDATION_IP/wp-admin"; then
+            echo "✅ WordPress admin panel is accessible"
+          else
+            echo "❌ WordPress admin panel is not accessible"
+            exit 1
+          fi
+        else
+          echo "Warning: inventory/hosts.yml not found, skipping validation test"
+        fi
+
+  manual-approval:
+    needs: test-validation-environment
+    if: ${{ github.event.inputs.auto_approve != 'true' }}
+    runs-on: ubuntu-latest
+    name: Manual Approval
+    
+    steps:
+    - name: Request approval
+      uses: trstringer/manual-approval@v1
+      with:
+        secret: ${{ secrets.APPROVAL_SECRET }}
+        approvers: ${{ secrets.APPROVERS || 'admin' }}
+        minimum-approvals: 1
+        exclude-workflow-initiator-as-approver: false
+
+  deploy-to-production:
+    needs: [test-validation-environment, manual-approval]
+    if: ${{ github.event.inputs.auto_approve == 'true' || needs.manual-approval.result == 'approved' }}
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install ansible boto3 pyyaml
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION || 'ap-northeast-1' }}
+        
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        
+    - name: Generate production inventory
+      working-directory: ./ansible
+      run: |
+        if [ -f "generate_inventory.py" ]; then
+          python3 generate_inventory.py --environment production
+        else
+          echo "Warning: generate_inventory.py not found"
+        fi
+        
+    - name: Deploy WordPress content
+      working-directory: ./ansible
+      run: |
+        if [ -f "inventory/hosts.yml" ]; then
+          # Sync WordPress files from validation to production
+          ansible wordpress -i inventory/hosts.yml -m synchronize \
+            -a "src=/var/www/html/ dest=/var/www/html/ delete=yes" \
+            --become
+        else
+          echo "Warning: inventory/hosts.yml not found, skipping deployment"
+        fi
+        
+    - name: Test production environment
+      working-directory: ./ansible
+      run: |
+        if [ -f "inventory/hosts.yml" ]; then
+          PRODUCTION_IP=$(ansible wordpress -i inventory/hosts.yml -m setup -a "filter=ansible_default_ipv4" | grep "address" | head -1 | awk '{print $2}' | tr -d '"')
+          
+          # Test WordPress site
+          if [ -n "$PRODUCTION_IP" ] && curl -f -s -o /dev/null --max-time 30 "http://$PRODUCTION_IP"; then
+            echo "✅ Production WordPress site is accessible"
+          else
+            echo "❌ Production WordPress site is not accessible"
+            exit 1
+          fi
+          
+          # Test admin panel
+          if [ -n "$PRODUCTION_IP" ] && curl -f -s -o /dev/null --max-time 30 "http://$PRODUCTION_IP/wp-admin"; then
+            echo "✅ Production WordPress admin panel is accessible"
+          else
+            echo "❌ Production WordPress admin panel is not accessible"
+            exit 1
+          fi
+        else
+          echo "Warning: inventory/hosts.yml not found, skipping production test"
+        fi
+
+  cleanup-validation:
+    needs: [deploy-to-production]
+    if: always()
+    runs-on: ubuntu-latest
+    name: Cleanup Validation Environment
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION || 'ap-northeast-1' }}
+        
+    - name: Stop validation EC2 instance
+      run: |
+        if [ -n "${{ secrets.VALIDATION_EC2_ID }}" ]; then
+          aws ec2 stop-instances --instance-ids ${{ secrets.VALIDATION_EC2_ID }}
+          echo "✅ Validation EC2 instance stopped"
+        else
+          echo "Warning: VALIDATION_EC2_ID not set"
+        fi
+        
+    - name: Delete validation RDS instance
+      run: |
+        if [ -n "${{ secrets.VALIDATION_RDS_ID }}" ]; then
+          aws rds delete-db-instance \
+            --db-instance-identifier "${{ secrets.VALIDATION_RDS_ID }}" \
+            --skip-final-snapshot
+          echo "✅ Validation RDS instance deleted"
+        else
+          echo "Warning: VALIDATION_RDS_ID not set"
+        fi
+
+  deployment-summary:
+    needs: [deploy-to-production, cleanup-validation]
+    if: always()
+    runs-on: ubuntu-latest
+    name: Deployment Summary
+    
+    steps:
+    - name: Create summary
+      run: |
+        echo "## Auto Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- Environment: Production"
+        echo "- Status: ✅ Completed successfully"
+        if [ -n "${{ needs.create-snapshot.outputs.snapshot_id }}" ]; then
+          echo "- Snapshot: ${{ needs.create-snapshot.outputs.snapshot_id }}"
+        fi
+        echo ""
+        echo "### Access Information"
+        if [ -n "${{ secrets.PRODUCTION_WORDPRESS_URL }}" ]; then
+          echo "- Production Site: ${{ secrets.PRODUCTION_WORDPRESS_URL }}"
+          echo "- Admin Panel: ${{ secrets.PRODUCTION_WORDPRESS_URL }}/wp-admin"
+        else
+          echo "- Production URL: Not configured"
+        fi 
