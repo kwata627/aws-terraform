@@ -1,0 +1,443 @@
+name: Ansible WordPress Environment Setup
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'ansible/**'
+      - 'deployment_config.json'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'ansible/**'
+      - 'deployment_config.json'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - development
+          - validation
+      playbook:
+        description: 'Playbook to execute'
+        required: false
+        default: 'playbooks/wordpress_setup.yml'
+        type: string
+      dry_run:
+        description: 'Dry run mode (check mode)'
+        required: false
+        default: false
+        type: boolean
+      step_by_step:
+        description: 'Execute step by step'
+        required: false
+        default: false
+        type: boolean
+      auto_approve:
+        description: 'Auto approve all prompts'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  ANSIBLE_HOST_KEY_CHECKING: false
+  ANSIBLE_FORCE_COLOR: true
+  ANSIBLE_SSH_ARGS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+jobs:
+  validate-config:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Ansible
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible boto3 pyyaml
+
+      - name: Validate deployment config
+        run: |
+          python3 -c "
+          import json
+          import sys
+          
+          try:
+              with open('deployment_config.json', 'r') as f:
+                  config = json.load(f)
+              
+              required_fields = [
+                  'production.ec2_instance_id',
+                  'production.rds_identifier'
+              ]
+              
+              for field in required_fields:
+                  keys = field.split('.')
+                  value = config
+                  for key in keys:
+                      if key not in value:
+                          print(f'Missing required field: {field}')
+                          sys.exit(1)
+                      value = value[key]
+                  
+                  if value is None or value == '':
+                      print(f'Empty value for required field: {field}')
+                      sys.exit(1)
+              
+              print('Configuration validation passed')
+              
+          except FileNotFoundError:
+              print('Configuration file not found: deployment_config.json')
+              sys.exit(1)
+          except json.JSONDecodeError as e:
+              print(f'Invalid JSON in configuration file: {e}')
+              sys.exit(1)
+          except Exception as e:
+              print(f'Error validating configuration: {e}')
+              sys.exit(1)
+          "
+
+  setup-ansible:
+    name: Setup Ansible Environment
+    runs-on: ubuntu-latest
+    needs: validate-config
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Ansible and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible boto3 pyyaml
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Generate inventory
+        working-directory: ./ansible
+        run: |
+          echo "Generating inventory..."
+          python3 generate_inventory.py
+          
+          if [ -f "inventory/hosts.yml" ]; then
+              echo "✓ Inventory generated successfully"
+              cat inventory/hosts.yml
+          else
+              echo "::error::Failed to generate inventory"
+              exit 1
+          fi
+
+      - name: Validate inventory
+        working-directory: ./ansible
+        run: |
+          echo "Validating inventory..."
+          ansible-inventory --list -i inventory/hosts.yml
+          echo "✓ Inventory validation passed"
+
+  test-connections:
+    name: Test Connections
+    runs-on: ubuntu-latest
+    needs: setup-ansible
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Ansible
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible boto3 pyyaml
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Copy inventory
+        run: |
+          cp -r ansible/inventory ./
+
+      - name: Test WordPress server connection
+        working-directory: ./ansible
+        run: |
+          echo "Testing WordPress server connection..."
+          
+          # リトライループで接続テスト
+          for i in {1..10}; do
+              if ansible wordpress -i inventory/hosts.yml -m ping; then
+                  echo "✓ WordPress server connection successful"
+                  break
+              else
+                  echo "Attempt $i: Connection failed, retrying..."
+                  sleep 30
+              fi
+          done
+          
+          if [ $i -eq 10 ]; then
+              echo "::error::WordPress server connection failed after 10 attempts"
+              exit 1
+          fi
+
+      - name: Test NAT instance connection
+        working-directory: ./ansible
+        run: |
+          echo "Testing NAT instance connection..."
+          
+          if ansible -i inventory/hosts.yml nat_instance --list-hosts 2>/dev/null | grep -q "nat_instance"; then
+              if ansible nat_instance -i inventory/hosts.yml -m ping; then
+                  echo "✓ NAT instance connection successful"
+              else
+                  echo "⚠️ NAT instance connection failed"
+              fi
+          else
+              echo "ℹ️ NAT instance not configured"
+          fi
+
+  execute-playbook:
+    name: Execute Ansible Playbook
+    runs-on: ubuntu-latest
+    needs: [setup-ansible, test-connections]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Ansible
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible boto3 pyyaml
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Copy inventory and config
+        run: |
+          cp -r ansible/inventory ./
+          cp -r ansible/group_vars ./
+          cp -r ansible/environments ./
+
+      - name: Manual approval for playbook execution
+        if: github.event.inputs.auto_approve != 'true'
+        run: |
+          echo "⚠️  ANSIBLE PLAYBOOK EXECUTION REQUIRES MANUAL APPROVAL ⚠️"
+          echo ""
+          echo "This will execute Ansible playbook to configure WordPress environment."
+          echo "Please approve this execution in the GitHub Actions interface."
+          echo ""
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Playbook: ${{ github.event.inputs.playbook }}"
+          echo "Dry Run: ${{ github.event.inputs.dry_run }}"
+          echo ""
+          echo "Waiting for manual approval..."
+
+      - name: Execute playbook
+        working-directory: ./ansible
+        run: |
+          echo "Executing Ansible playbook..."
+          
+          PLAYBOOK="${{ github.event.inputs.playbook }}"
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          DRY_RUN="${{ github.event.inputs.dry_run }}"
+          STEP_BY_STEP="${{ github.event.inputs.step_by_step }}"
+          
+          # 環境変数の設定
+          if [ -f "environments/${ENVIRONMENT}.yml" ]; then
+              export ANSIBLE_EXTRA_VARS="@environments/${ENVIRONMENT}.yml"
+              echo "Using environment file: environments/${ENVIRONMENT}.yml"
+          fi
+          
+          # ドライランまたは実際の実行
+          if [ "$DRY_RUN" = "true" ]; then
+              echo "Running in check mode (dry run)..."
+              ansible-playbook --check --diff "$PLAYBOOK" -i inventory/hosts.yml
+          elif [ "$STEP_BY_STEP" = "true" ]; then
+              echo "Running step by step..."
+              ansible-playbook playbooks/step_by_step_setup.yml -i inventory/hosts.yml
+          else
+              echo "Running playbook normally..."
+              ansible-playbook "$PLAYBOOK" -i inventory/hosts.yml
+          fi
+          
+          echo "✓ Playbook execution completed"
+
+  test-environment:
+    name: Test Environment
+    runs-on: ubuntu-latest
+    needs: execute-playbook
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Ansible
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible boto3 pyyaml
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Copy inventory and config
+        run: |
+          cp -r ansible/inventory ./
+          cp -r ansible/group_vars ./
+
+      - name: Test system information
+        working-directory: ./ansible
+        run: |
+          echo "Testing system information..."
+          ansible wordpress -i inventory/hosts.yml -m setup -a "filter=ansible_distribution*"
+
+      - name: Test service status
+        working-directory: ./ansible
+        run: |
+          echo "Testing service status..."
+          ansible wordpress -i inventory/hosts.yml -m service_facts
+
+      - name: Test file existence
+        working-directory: ./ansible
+        run: |
+          echo "Testing file existence..."
+          ansible wordpress -i inventory/hosts.yml -m stat -a "path=/var/www/html/wp-config.php"
+          ansible wordpress -i inventory/hosts.yml -m stat -a "path=/etc/httpd/conf/httpd.conf"
+          ansible wordpress -i inventory/hosts.yml -m stat -a "path=/etc/php.ini"
+
+      - name: Test port connectivity
+        working-directory: ./ansible
+        run: |
+          echo "Testing port connectivity..."
+          ansible wordpress -i inventory/hosts.yml -m wait_for -a "port=80 timeout=10"
+          ansible wordpress -i inventory/hosts.yml -m wait_for -a "port=22 timeout=10"
+
+      - name: Test WordPress access
+        working-directory: ./ansible
+        run: |
+          echo "Testing WordPress access..."
+          
+          # WordPress IPアドレスの取得
+          WORDPRESS_IP=$(ansible wordpress -i inventory/hosts.yml -m setup -a "filter=ansible_default_ipv4" | grep "address" | head -1 | awk '{print $2}' | tr -d '"')
+          
+          if [ -n "$WORDPRESS_IP" ]; then
+              echo "WordPress IP: $WORDPRESS_IP"
+              
+              # リトライループでWordPressアクセステスト
+              for i in {1..15}; do
+                  if curl -f -s "http://$WORDPRESS_IP" > /dev/null; then
+                      echo "✓ WordPress site is accessible"
+                      break
+                  else
+                      echo "Attempt $i: WordPress site not ready yet, waiting..."
+                      sleep 10
+                  fi
+              done
+              
+              if [ $i -eq 15 ]; then
+                  echo "::error::WordPress site is not accessible after 15 attempts"
+                  exit 1
+              fi
+          else
+              echo "::error::Could not get WordPress IP address"
+              exit 1
+          fi
+
+      - name: Test database connection
+        working-directory: ./ansible
+        run: |
+          echo "Testing database connection..."
+          ansible wordpress -i inventory/hosts.yml -m mysql_query -a "
+              login_host={{ wordpress_db_host }}
+              login_user={{ wordpress_db_user }}
+              login_password={{ wordpress_db_password }}
+              query='SELECT 1'
+          " --extra-vars "@group_vars/wordpress.yml"
+
+  notify-completion:
+    name: Notify Completion
+    runs-on: ubuntu-latest
+    needs: [execute-playbook, test-environment]
+    if: always()
+    steps:
+      - name: Notify success
+        if: needs.execute-playbook.result == 'success' && needs.test-environment.result == 'success'
+        run: |
+          echo "✅ Ansible WordPress setup completed successfully"
+          echo "WordPress environment is ready"
+          # TODO: Add Slack notification here if needed
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"✅ Ansible WordPress setup completed successfully"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify failure
+        if: needs.execute-playbook.result == 'failure' || needs.test-environment.result == 'failure'
+        run: |
+          echo "❌ Ansible WordPress setup failed"
+          echo "Please check the logs and take appropriate action"
+          # TODO: Add Slack notification here if needed
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"❌ Ansible WordPress setup failed"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}

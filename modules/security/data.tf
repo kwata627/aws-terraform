@@ -23,8 +23,7 @@ data "aws_region" "current" {
 # -----------------------------------------------------------------------------
 
 data "aws_vpc" "selected" {
-  count = var.vpc_id != null ? 1 : 0
-  id    = var.vpc_id
+  id = var.vpc_id
 }
 
 # -----------------------------------------------------------------------------
@@ -32,13 +31,10 @@ data "aws_vpc" "selected" {
 # -----------------------------------------------------------------------------
 
 data "aws_security_groups" "vpc_security_groups" {
-  count = var.vpc_id != null ? 1 : 0
-  
   filter {
     name   = "vpc-id"
     values = [var.vpc_id]
   }
-  
   filter {
     name   = "group-name"
     values = ["${var.project}-*"]

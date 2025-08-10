@@ -1,19 +1,21 @@
 {
     "production": {
-        "ec2_instance_id": "",
+        "ec2_instance_id": "i-1234567890abcdef0",
         "rds_identifier": "wp-shamo-rds",
         "wordpress_url": "http://shamonooyuuhan.com",
+        "db_password": "test_production_password",
         "backup_retention_days": 7
     },
     "validation": {
-        "ec2_instance_id": "",
+        "ec2_instance_id": "i-0987654321fedcba0",
         "rds_identifier": "wp-shamo-rds-validation",
         "wordpress_url": "http://validation-ip",
+        "db_password": "test_validation_password",
         "test_timeout_minutes": 30
     },
     "deployment": {
         "auto_approve": false,
         "rollback_on_failure": true,
-        "notification_email": ""
+        "notification_email": "admin@example.com"
     }
 }

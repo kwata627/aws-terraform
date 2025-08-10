@@ -1,0 +1,338 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'scripts/deployment/deploy_to_production.sh'
+      - 'deployment_config.json'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'scripts/deployment/deploy_to_production.sh'
+      - 'deployment_config.json'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      dry_run:
+        description: 'Dry run mode (no actual changes)'
+        required: false
+        default: false
+        type: boolean
+      auto_approve:
+        description: 'Auto approve all prompts'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  AWS_REGION: ap-northeast-1
+  CONFIG_FILE: deployment_config.json
+
+jobs:
+  validate-config:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Validate deployment config
+        run: |
+          python3 -c "
+          import json
+          import sys
+          
+          try:
+              with open('${{ env.CONFIG_FILE }}', 'r') as f:
+                  config = json.load(f)
+              
+              required_fields = [
+                  'production.ec2_instance_id',
+                  'production.rds_identifier',
+                  'production.wordpress_url',
+                  'production.db_password',
+                  'validation.ec2_instance_id',
+                  'validation.rds_identifier',
+                  'validation.db_password'
+              ]
+              
+              for field in required_fields:
+                  keys = field.split('.')
+                  value = config
+                  for key in keys:
+                      if key not in value:
+                          print(f'Missing required field: {field}')
+                          sys.exit(1)
+                      value = value[key]
+                  
+                  if value is None or value == '':
+                      print(f'Empty value for required field: {field}')
+                      sys.exit(1)
+              
+              print('Configuration validation passed')
+              
+          except FileNotFoundError:
+              print(f'Configuration file not found: ${{ env.CONFIG_FILE }}')
+              sys.exit(1)
+          except json.JSONDecodeError as e:
+              print(f'Invalid JSON in configuration file: {e}')
+              sys.exit(1)
+          except Exception as e:
+              print(f'Error validating configuration: {e}')
+              sys.exit(1)
+          "
+
+  check-validation-environment:
+    name: Check Validation Environment
+    runs-on: ubuntu-latest
+    needs: validate-config
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Load configuration
+        id: config
+        run: |
+          VALID_EC2_ID=$(jq -r '.validation.ec2_instance_id' "${{ env.CONFIG_FILE }}")
+          echo "valid_ec2_id=$VALID_EC2_ID" >> $GITHUB_OUTPUT
+
+      - name: Check validation environment status
+        run: |
+          echo "Checking validation environment status..."
+          VALID_STATUS=$(aws ec2 describe-instances --instance-ids "${{ steps.config.outputs.valid_ec2_id }}" --query 'Reservations[0].Instances[0].State.Name' --output text)
+          
+          if [ "$VALID_STATUS" != "running" ]; then
+              echo "::error::Validation environment is not running. Please run prepare-validation workflow first."
+              exit 1
+          fi
+          
+          echo "✓ Validation environment is running"
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [validate-config, check-validation-environment]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Load configuration
+        id: config
+        run: |
+          PROD_EC2_ID=$(jq -r '.production.ec2_instance_id' "${{ env.CONFIG_FILE }}")
+          PROD_RDS_ID=$(jq -r '.production.rds_identifier' "${{ env.CONFIG_FILE }}")
+          PROD_WP_URL=$(jq -r '.production.wordpress_url' "${{ env.CONFIG_FILE }}")
+          PROD_DB_PASSWORD=$(jq -r '.production.db_password' "${{ env.CONFIG_FILE }}")
+          VALID_EC2_ID=$(jq -r '.validation.ec2_instance_id' "${{ env.CONFIG_FILE }}")
+          VALID_RDS_ID=$(jq -r '.validation.rds_identifier' "${{ env.CONFIG_FILE }}")
+          VALID_DB_PASSWORD=$(jq -r '.validation.db_password' "${{ env.CONFIG_FILE }}")
+          AUTO_APPROVE=$(jq -r '.deployment.auto_approve // "false"' "${{ env.CONFIG_FILE }}")
+          NOTIFICATION_EMAIL=$(jq -r '.deployment.notification_email // ""' "${{ env.CONFIG_FILE }}")
+          
+          echo "prod_ec2_id=$PROD_EC2_ID" >> $GITHUB_OUTPUT
+          echo "prod_rds_id=$PROD_RDS_ID" >> $GITHUB_OUTPUT
+          echo "prod_wp_url=$PROD_WP_URL" >> $GITHUB_OUTPUT
+          echo "prod_db_password=$PROD_DB_PASSWORD" >> $GITHUB_OUTPUT
+          echo "valid_ec2_id=$VALID_EC2_ID" >> $GITHUB_OUTPUT
+          echo "valid_rds_id=$VALID_RDS_ID" >> $GITHUB_OUTPUT
+          echo "valid_db_password=$VALID_DB_PASSWORD" >> $GITHUB_OUTPUT
+          echo "auto_approve=$AUTO_APPROVE" >> $GITHUB_OUTPUT
+          echo "notification_email=$NOTIFICATION_EMAIL" >> $GITHUB_OUTPUT
+
+      - name: Manual approval for production deployment
+        if: steps.config.outputs.auto_approve != 'true'
+        run: |
+          echo "⚠️  PRODUCTION DEPLOYMENT REQUIRES MANUAL APPROVAL ⚠️"
+          echo ""
+          echo "This will deploy changes from validation environment to production."
+          echo "Please approve this deployment in the GitHub Actions interface."
+          echo ""
+          echo "Production URL: ${{ steps.config.outputs.prod_wp_url }}"
+          echo "Validation environment will be stopped after deployment."
+          echo ""
+          echo "Waiting for manual approval..."
+
+      - name: Create production backup
+        id: backup
+        run: |
+          echo "Creating production backup..."
+          
+          # MySQLクライアントのインストール
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
+          
+          PROD_RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier "${{ steps.config.outputs.prod_rds_id }}" --query 'DBInstances[0].Endpoint.Address' --output text)
+          BACKUP_FILE="backup_production_$(date +%Y%m%d_%H%M%S).sql"
+          
+          mysqldump -h "$PROD_RDS_ENDPOINT" -u admin -p"${{ steps.config.outputs.prod_db_password }}" wordpress > "$BACKUP_FILE"
+          
+          echo "backup_file=$BACKUP_FILE" >> $GITHUB_OUTPUT
+          echo "✓ Production database backup created: $BACKUP_FILE"
+
+      - name: Backup WordPress files
+        run: |
+          echo "Creating WordPress files backup..."
+          
+          PROD_IP=$(aws ec2 describe-instances --instance-ids "${{ steps.config.outputs.prod_ec2_id }}" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+          
+          # SSH鍵の設定（GitHub Secretsから取得）
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+          
+          # WordPressファイルのバックアップ
+          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key ec2-user@"$PROD_IP" "sudo tar -czf /tmp/wordpress_backup.tar.gz -C /var/www/html ."
+          scp -o StrictHostKeyChecking=no -i /tmp/deploy_key ec2-user@"$PROD_IP":/tmp/wordpress_backup.tar.gz "wordpress_files_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+          
+          echo "✓ WordPress files backup created"
+
+      - name: Sync database from validation to production
+        run: |
+          echo "Syncing database from validation to production..."
+          
+          VALID_RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier "${{ steps.config.outputs.valid_rds_id }}" --query 'DBInstances[0].Endpoint.Address' --output text)
+          PROD_RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier "${{ steps.config.outputs.prod_rds_id }}" --query 'DBInstances[0].Endpoint.Address' --output text)
+          
+          # 検証環境のデータベースをダンプ
+          mysqldump -h "$VALID_RDS_ENDPOINT" -u admin -p"${{ steps.config.outputs.valid_db_password }}" wordpress > validation_dump.sql
+          
+          # 本番環境にデータを復元
+          mysql -h "$PROD_RDS_ENDPOINT" -u admin -p"${{ steps.config.outputs.prod_db_password }}" wordpress < validation_dump.sql
+          
+          echo "✓ Database sync completed"
+
+      - name: Sync WordPress files from validation to production
+        run: |
+          echo "Syncing WordPress files from validation to production..."
+          
+          PROD_IP=$(aws ec2 describe-instances --instance-ids "${{ steps.config.outputs.prod_ec2_id }}" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+          VALID_IP=$(aws ec2 describe-instances --instance-ids "${{ steps.config.outputs.valid_ec2_id }}" --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)
+          
+          # SSH鍵の設定
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+          
+          # WordPressファイルの同期
+          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key ec2-user@"$PROD_IP" "mkdir -p /tmp/wordpress_sync"
+          scp -o StrictHostKeyChecking=no -i /tmp/deploy_key -r ec2-user@"$VALID_IP":/var/www/html/* ec2-user@"$PROD_IP":/tmp/wordpress_sync/
+          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key ec2-user@"$PROD_IP" "sudo rsync -av /tmp/wordpress_sync/ /var/www/html/ && sudo chown -R apache:apache /var/www/html/"
+          
+          echo "✓ WordPress files sync completed"
+
+      - name: Test production environment
+        run: |
+          echo "Testing production environment..."
+          
+          # サイトの動作確認
+          for i in {1..10}; do
+              if curl -f -s "${{ steps.config.outputs.prod_wp_url }}" > /dev/null; then
+                  echo "✓ Production site is accessible"
+                  break
+              else
+                  echo "Attempt $i: Production site not ready yet, waiting..."
+                  sleep 10
+              fi
+          done
+          
+          if [ $i -eq 10 ]; then
+              echo "::error::Production site is not accessible after 10 attempts"
+              exit 1
+          fi
+          
+          # 管理画面の動作確認
+          if curl -f -s "${{ steps.config.outputs.prod_wp_url }}/wp-admin" > /dev/null; then
+              echo "✓ Production admin panel is accessible"
+          else
+              echo "::error::Production admin panel is not accessible"
+              exit 1
+          fi
+
+      - name: Stop validation environment
+        run: |
+          echo "Stopping validation environment..."
+          
+          # 検証用EC2の停止
+          aws ec2 stop-instances --instance-ids "${{ steps.config.outputs.valid_ec2_id }}"
+          echo "✓ Validation EC2 stopped"
+          
+          # 検証用RDSの停止
+          aws rds stop-db-instance --db-instance-identifier "${{ steps.config.outputs.valid_rds_id }}"
+          echo "✓ Validation RDS stopped"
+
+      - name: Cleanup temporary files
+        run: |
+          echo "Cleaning up temporary files..."
+          
+          PROD_IP=$(aws ec2 describe-instances --instance-ids "${{ steps.config.outputs.prod_ec2_id }}" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+          
+          # SSH鍵の設定
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+          
+          # 一時ファイルの削除
+          rm -f validation_dump.sql
+          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key ec2-user@"$PROD_IP" "rm -rf /tmp/wordpress_sync"
+          
+          echo "✓ Cleanup completed"
+
+      - name: Display deployment summary
+        run: |
+          echo "=== Production Deployment Completed ==="
+          echo "Production URL: ${{ steps.config.outputs.prod_wp_url }}"
+          echo "Production Admin URL: ${{ steps.config.outputs.prod_wp_url }}/wp-admin"
+          echo "Backup File: ${{ steps.backup.outputs.backup_file }}"
+          echo ""
+          echo "Validation environment has been stopped to reduce costs."
+          echo "Deployment completed successfully!"
+
+  notify-completion:
+    name: Notify Completion
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: always()
+    steps:
+      - name: Notify success
+        if: needs.deploy-production.result == 'success'
+        run: |
+          echo "✅ Production deployment completed successfully"
+          echo "Production environment is now updated"
+          # TODO: Add Slack notification here if needed
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"✅ Production deployment completed successfully"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify failure
+        if: needs.deploy-production.result == 'failure'
+        run: |
+          echo "❌ Production deployment failed"
+          echo "Please check the logs and take appropriate action"
+          # TODO: Add Slack notification here if needed
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"❌ Production deployment failed"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}

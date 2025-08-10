@@ -25,7 +25,7 @@ module "nat_instance" {
   source            = "./modules/nat-instance"
   project           = var.project
   subnet_id         = module.network.public_subnet_ids[0]
-  security_group_id = module.security.nat_instance_sg_id
+  security_group_id = local.enable_security ? module.security[0].nat_instance_sg_id : null
   ami_id            = local.ec2_config.ami_id
   instance_type     = "t3.nano"
   key_name          = module.ssh.key_name
@@ -72,6 +72,10 @@ module "network" {
 # Security Module
 # -----------------------------------------------------------------------------
 
+locals {
+  enable_security = var.vpc_cidr != ""
+}
+
 module "security" {
   source   = "./modules/security"
   project  = var.project
@@ -88,6 +92,7 @@ module "security" {
   
   # 環境設定
   environment = local.environment_config.name
+  count = local.enable_security ? 1 : 0
 }
 
 # -----------------------------------------------------------------------------
@@ -101,8 +106,8 @@ module "ec2" {
   instance_type     = local.ec2_config.instance_type
   subnet_id         = module.network.public_subnet_ids[0]
   private_subnet_id = module.network.private_subnet_ids[0]
-  security_group_id = module.security.ec2_public_sg_id
-  validation_security_group_id = module.security.ec2_private_sg_id
+  security_group_id = local.enable_security ? module.security[0].ec2_public_sg_id : null
+  validation_security_group_id = local.enable_security ? module.security[0].ec2_private_sg_id : null
   key_name          = module.ssh.key_name
   ssh_public_key    = module.ssh.public_key_openssh
   ec2_name          = local.ec2_config.ec2_name
@@ -122,7 +127,7 @@ module "rds" {
   
   # ネットワーク設定
   private_subnet_ids = module.network.private_subnet_ids
-  rds_security_group_id = module.security.rds_sg_id
+  rds_security_group_id = local.enable_security ? module.security[0].rds_sg_id : null
   
   # データベース設定
   db_password = local.rds_config.db_password

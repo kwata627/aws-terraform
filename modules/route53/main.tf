@@ -264,26 +264,22 @@ resource "aws_route53_health_check" "main" {
 
 # WordPress用Aレコード
 resource "aws_route53_record" "wordpress" {
-  count = var.wordpress_ip != "" ? 1 : 0
-
   zone_id = aws_route53_zone.main.zone_id
   name    = local.normalized_domain_name
   type    = "A"
   ttl     = "300"
-  records = [var.wordpress_ip]
+  records = var.wordpress_ip != "" ? [var.wordpress_ip] : []
 
   # Route53レコードではタグは使用できないため削除
 }
 
 # CloudFront用CNAMEレコード
 resource "aws_route53_record" "cloudfront" {
-  count = var.cloudfront_domain_name != "" ? 1 : 0
-
   zone_id = aws_route53_zone.main.zone_id
   name    = "static.${local.normalized_domain_name}"
   type    = "CNAME"
   ttl     = "300"
-  records = [var.cloudfront_domain_name]
+  records = var.cloudfront_domain_name != "" ? [var.cloudfront_domain_name] : []
 
   # Route53レコードではタグは使用できないため削除
 }

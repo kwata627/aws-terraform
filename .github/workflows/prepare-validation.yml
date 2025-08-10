@@ -1,0 +1,274 @@
+name: Prepare Validation Environment
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'scripts/deployment/prepare_validation.sh'
+      - 'deployment_config.json'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'scripts/deployment/prepare_validation.sh'
+      - 'deployment_config.json'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to prepare'
+        required: true
+        default: 'validation'
+        type: choice
+        options:
+          - validation
+          - staging
+      dry_run:
+        description: 'Dry run mode (no actual changes)'
+        required: false
+        default: false
+        type: boolean
+      auto_approve:
+        description: 'Auto approve all prompts'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  AWS_REGION: ap-northeast-1
+  CONFIG_FILE: deployment_config.json
+
+jobs:
+  validate-config:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Validate deployment config
+        run: |
+          python3 -c "
+          import json
+          import sys
+          
+          try:
+              with open('${{ env.CONFIG_FILE }}', 'r') as f:
+                  config = json.load(f)
+              
+              required_fields = [
+                  'production.ec2_instance_id',
+                  'production.rds_identifier',
+                  'validation.ec2_instance_id',
+                  'validation.rds_identifier',
+                  'validation.wordpress_url',
+                  'validation.db_password'
+              ]
+              
+              for field in required_fields:
+                  keys = field.split('.')
+                  value = config
+                  for key in keys:
+                      if key not in value:
+                          print(f'Missing required field: {field}')
+                          sys.exit(1)
+                      value = value[key]
+                  
+                  if value is None or value == '':
+                      print(f'Empty value for required field: {field}')
+                      sys.exit(1)
+              
+              print('Configuration validation passed')
+              
+          except FileNotFoundError:
+              print(f'Configuration file not found: ${{ env.CONFIG_FILE }}')
+              sys.exit(1)
+          except json.JSONDecodeError as e:
+              print(f'Invalid JSON in configuration file: {e}')
+              sys.exit(1)
+          except Exception as e:
+              print(f'Error validating configuration: {e}')
+              sys.exit(1)
+          "
+
+  prepare-validation:
+    name: Prepare Validation Environment
+    runs-on: ubuntu-latest
+    needs: validate-config
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Load configuration
+        id: config
+        run: |
+          # 設定ファイルから値を読み込み
+          PROD_EC2_ID=$(jq -r '.production.ec2_instance_id' "${{ env.CONFIG_FILE }}")
+          PROD_RDS_ID=$(jq -r '.production.rds_identifier' "${{ env.CONFIG_FILE }}")
+          VALID_EC2_ID=$(jq -r '.validation.ec2_instance_id' "${{ env.CONFIG_FILE }}")
+          VALID_RDS_ID=$(jq -r '.validation.rds_identifier' "${{ env.CONFIG_FILE }}")
+          VALID_WP_URL=$(jq -r '.validation.wordpress_url' "${{ env.CONFIG_FILE }}")
+          VALID_DB_PASSWORD=$(jq -r '.validation.db_password' "${{ env.CONFIG_FILE }}")
+          
+          echo "prod_ec2_id=$PROD_EC2_ID" >> $GITHUB_OUTPUT
+          echo "prod_rds_id=$PROD_RDS_ID" >> $GITHUB_OUTPUT
+          echo "valid_ec2_id=$VALID_EC2_ID" >> $GITHUB_OUTPUT
+          echo "valid_rds_id=$VALID_RDS_ID" >> $GITHUB_OUTPUT
+          echo "valid_wp_url=$VALID_WP_URL" >> $GITHUB_OUTPUT
+          echo "valid_db_password=$VALID_DB_PASSWORD" >> $GITHUB_OUTPUT
+
+      - name: Create production snapshot
+        id: snapshot
+        run: |
+          echo "Creating production snapshot..."
+          SNAPSHOT_ID="wp-production-$(date +%Y%m%d-%H%M%S)"
+          
+          aws rds create-db-snapshot \
+              --db-instance-identifier "${{ steps.config.outputs.prod_rds_id }}" \
+              --db-snapshot-identifier "$SNAPSHOT_ID" \
+              --tags Key=Purpose,Value=DeploymentBackup Key=Date,Value=$(date +%Y-%m-%d)
+          
+          echo "snapshot_id=$SNAPSHOT_ID" >> $GITHUB_OUTPUT
+          echo "✓ Production snapshot created: $SNAPSHOT_ID"
+
+      - name: Start validation EC2
+        run: |
+          echo "Starting validation EC2 instance..."
+          aws ec2 start-instances --instance-ids "${{ steps.config.outputs.valid_ec2_id }}"
+          echo "✓ Validation EC2 started"
+
+      - name: Start validation RDS
+        id: rds
+        run: |
+          echo "Checking validation RDS status..."
+          
+          # RDSインスタンスの存在確認
+          if aws rds describe-db-instances --db-instance-identifier "${{ steps.config.outputs.valid_rds_id }}" --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null | grep -q "available"; then
+              echo "✓ Validation RDS is already running"
+              echo "rds_restored=false" >> $GITHUB_OUTPUT
+          else
+              echo "Restoring validation RDS from snapshot..."
+              aws rds restore-db-instance-from-db-snapshot \
+                  --db-instance-identifier "${{ steps.config.outputs.valid_rds_id }}" \
+                  --db-snapshot-identifier "${{ steps.snapshot.outputs.snapshot_id }}" \
+                  --db-instance-class db.t3.micro \
+                  --no-multi-az \
+                  --tags Key=Purpose,Value=Validation Key=Date,Value=$(date +%Y-%m-%d)
+              echo "rds_restored=true" >> $GITHUB_OUTPUT
+              echo "✓ Validation RDS restoration started"
+          fi
+
+      - name: Wait for EC2 to be ready
+        run: |
+          echo "Waiting for validation EC2 to be ready..."
+          aws ec2 wait instance-running --instance-ids "${{ steps.config.outputs.valid_ec2_id }}"
+          aws ec2 wait instance-status-ok --instance-ids "${{ steps.config.outputs.valid_ec2_id }}"
+          echo "✓ Validation EC2 is ready"
+
+      - name: Wait for RDS to be ready
+        if: steps.rds.outputs.rds_restored == 'true'
+        run: |
+          echo "Waiting for validation RDS to be ready..."
+          aws rds wait db-instance-available --db-instance-identifier "${{ steps.config.outputs.valid_rds_id }}"
+          echo "✓ Validation RDS is ready"
+
+      - name: Get validation environment IP
+        id: ip
+        run: |
+          VALID_IP=$(aws ec2 describe-instances --instance-ids "${{ steps.config.outputs.valid_ec2_id }}" --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)
+          echo "valid_ip=$VALID_IP" >> $GITHUB_OUTPUT
+          echo "✓ Validation environment IP: $VALID_IP"
+
+      - name: Test WordPress site
+        run: |
+          echo "Testing WordPress site..."
+          
+          # リトライループでサイトの準備完了を待機
+          for i in {1..30}; do
+              if curl -f -s "${{ steps.config.outputs.valid_wp_url }}" > /dev/null; then
+                  echo "✓ WordPress site is accessible"
+                  break
+              else
+                  echo "Attempt $i: WordPress site not ready yet, waiting..."
+                  sleep 10
+              fi
+          done
+          
+          if [ $i -eq 30 ]; then
+              echo "::error::WordPress site is not accessible after 30 attempts"
+              exit 1
+          fi
+
+      - name: Test WordPress admin
+        run: |
+          echo "Testing WordPress admin panel..."
+          
+          if curl -f -s "${{ steps.config.outputs.valid_wp_url }}/wp-admin" > /dev/null; then
+              echo "✓ WordPress admin panel is accessible"
+          else
+              echo "::error::WordPress admin panel is not accessible"
+              exit 1
+          fi
+
+      - name: Test database connection
+        run: |
+          echo "Testing database connection..."
+          
+          # MySQLクライアントのインストール
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
+          
+          VALID_RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier "${{ steps.config.outputs.valid_rds_id }}" --query 'DBInstances[0].Endpoint.Address' --output text)
+          
+          if mysql -h "$VALID_RDS_ENDPOINT" -u admin -p"${{ steps.config.outputs.valid_db_password }}" -e "SELECT 1;" 2>/dev/null; then
+              echo "✓ Database connection is working"
+          else
+              echo "::error::Database connection failed"
+              exit 1
+          fi
+
+      - name: Display validation environment info
+        run: |
+          echo "=== Validation Environment Ready ==="
+          echo "Validation Environment IP: ${{ steps.ip.outputs.valid_ip }}"
+          echo "Validation Environment URL: ${{ steps.config.outputs.valid_wp_url }}"
+          echo "Validation Admin URL: ${{ steps.config.outputs.valid_wp_url }}/wp-admin"
+          echo "Snapshot ID: ${{ steps.snapshot.outputs.snapshot_id }}"
+          echo ""
+          echo "Validation environment is ready for testing."
+          echo "After testing, you can deploy to production using the deployment workflow."
+
+  notify-completion:
+    name: Notify Completion
+    runs-on: ubuntu-latest
+    needs: prepare-validation
+    if: always()
+    steps:
+      - name: Notify success
+        if: needs.prepare-validation.result == 'success'
+        run: |
+          echo "✅ Validation environment preparation completed successfully"
+          echo "Validation environment is ready for testing"
+          # TODO: Add Slack notification here if needed
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"✅ Validation environment preparation completed successfully"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify failure
+        if: needs.prepare-validation.result == 'failure'
+        run: |
+          echo "❌ Validation environment preparation failed"
+          # TODO: Add Slack notification here if needed
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"❌ Validation environment preparation failed"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}

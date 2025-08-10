@@ -1,8 +1,10 @@
-# Terraform state
+# Terraform state and plan files
 *.tfstate
 *.tfstate.backup
+*.tfstate.*.backup
 .terraform/
 crash.log
+*.tfplan
 
 # Sensitive configuration files
 *.tfvars
@@ -49,3 +51,15 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Test directories
+test_workflow/
+
+# Ansible artifacts
+ansible/inventory/hosts.yml
+ansible/*.retry
+
+# Deployment artifacts
+*.tar.gz
+*.sql
+backup_*

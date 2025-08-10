@@ -180,6 +180,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "main" {
     id     = "general-lifecycle"
     status = "Enabled"
 
+    # フィルター設定（必須）
+    filter {
+      prefix = ""
+    }
+
     # 非現行バージョンの管理
     noncurrent_version_transition {
       noncurrent_days = var.noncurrent_version_transition_days
@@ -202,6 +207,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "main" {
     content {
       id     = "object-expiration"
       status = "Enabled"
+
+      # フィルター設定（必須）
+      filter {
+        prefix = ""
+      }
 
       expiration {
         days = var.object_expiration_days
