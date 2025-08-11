@@ -7,6 +7,238 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
+# SSH Key Auto-Setup Resource
+# -----------------------------------------------------------------------------
+
+resource "null_resource" "ssh_key_setup" {
+  triggers = {
+    ssh_private_key = module.ssh.private_key_pem
+    wordpress_public_ip = module.ec2.public_ip
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      # SSH鍵を保存
+      echo '${module.ssh.private_key_pem}' > ~/.ssh/wordpress_key
+      chmod 600 ~/.ssh/wordpress_key
+      
+      # SSH設定ファイルに追加（既存の設定をチェック）
+      if ! grep -q "Host wordpress-server" ~/.ssh/config 2>/dev/null; then
+        echo "" >> ~/.ssh/config
+        echo "Host wordpress-server" >> ~/.ssh/config
+        echo "  HostName ${module.ec2.public_ip}" >> ~/.ssh/config
+        echo "  User ec2-user" >> ~/.ssh/config
+        echo "  IdentityFile ~/.ssh/wordpress_key" >> ~/.ssh/config
+        echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+        echo "  UserKnownHostsFile /dev/null" >> ~/.ssh/config
+      else
+        # 既存の設定を更新
+        sed -i "s|HostName.*|HostName ${module.ec2.public_ip}|" ~/.ssh/config
+      fi
+      
+      echo "SSH鍵の設定が完了しました:"
+      echo "- 秘密鍵: ~/.ssh/wordpress_key"
+      echo "- SSH設定: ~/.ssh/config"
+      echo "- 接続コマンド: ssh wordpress-server"
+    EOT
+  }
+
+  depends_on = [module.ec2, module.ssh]
+}
+
+# -----------------------------------------------------------------------------
+# Ansible Auto-Setup Resource
+# -----------------------------------------------------------------------------
+
+resource "null_resource" "ansible_setup" {
+  triggers = {
+    wordpress_public_ip = module.ec2.public_ip
+    ssh_private_key = module.ssh.private_key_pem
+    domain_name = var.domain_name
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Ansibleディレクトリに移動
+      cd ansible
+      
+      # インベントリ生成スクリプトの実行
+      echo "Ansibleインベントリを生成中..."
+      python3 generate_inventory.py
+      
+      # 生成されたインベントリの確認
+      if [ -f "inventory/hosts.yml" ]; then
+        echo "✓ インベントリファイルが生成されました: inventory/hosts.yml"
+        echo ""
+        echo "インベントリ内容:"
+        cat inventory/hosts.yml
+      else
+        echo "✗ インベントリファイルの生成に失敗しました"
+        exit 1
+      fi
+      
+      # Ansible設定の確認
+      echo ""
+      echo "Ansible設定を確認中..."
+      if command -v ansible-inventory &> /dev/null; then
+        ansible-inventory --list -i inventory/hosts.yml
+        echo "✓ Ansible設定が正常です"
+      else
+        echo "警告: ansible-inventoryコマンドが見つかりません"
+      fi
+      
+      # 元のディレクトリに戻る
+      cd ..
+      
+      echo ""
+      echo "Ansible設定が完了しました！"
+      echo "次のステップ:"
+      echo "  cd ansible"
+      echo "  ansible-playbook -i inventory/hosts.yml playbooks/wordpress-setup.yml"
+    EOT
+  }
+
+  depends_on = [module.ec2, module.ssh, null_resource.ssh_key_setup]
+}
+
+# -----------------------------------------------------------------------------
+# WordPress Environment Setup Resource
+# -----------------------------------------------------------------------------
+
+resource "null_resource" "wordpress_setup" {
+  triggers = {
+    wordpress_public_ip = module.ec2.public_ip
+    ssh_private_key = module.ssh.private_key_pem
+    rds_endpoint = module.rds.db_endpoint
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      # 環境変数の設定
+      export WORDPRESS_DB_HOST="${module.rds.db_endpoint}"
+      export WORDPRESS_DB_PASSWORD="${var.db_password}"
+      
+      # Ansibleディレクトリに移動
+      cd ansible
+      
+      # SSH接続テスト
+      echo "SSH接続をテスト中..."
+      if ansible wordpress -m ping -i inventory/hosts.yml; then
+        echo "✓ SSH接続成功"
+      else
+        echo "✗ SSH接続に失敗しました。サーバーの起動を待機中..."
+        sleep 30
+        if ansible wordpress -m ping -i inventory/hosts.yml; then
+          echo "✓ SSH接続成功（再試行）"
+        else
+          echo "✗ SSH接続に失敗しました"
+          exit 1
+        fi
+      fi
+      
+      # WordPress環境構築の実行
+      echo "WordPress環境構築を開始中..."
+      if ansible-playbook -i inventory/hosts.yml playbooks/step_by_step_setup.yml; then
+        echo "✓ WordPress環境構築が完了しました"
+      else
+        echo "✗ WordPress環境構築に失敗しました"
+        exit 1
+      fi
+      
+      # 元のディレクトリに戻る
+      cd ..
+      
+      echo ""
+      echo "WordPress環境構築が完了しました！"
+      echo "アクセス情報:"
+      echo "- WordPress URL: https://${var.domain_name}"
+      echo "- 管理画面: https://${var.domain_name}/wp-admin"
+    EOT
+  }
+
+  depends_on = [module.ec2, module.ssh, module.rds, null_resource.ansible_setup]
+}
+
+# -----------------------------------------------------------------------------
+# SSL Setup Resource
+# -----------------------------------------------------------------------------
+
+resource "null_resource" "ssl_setup" {
+  triggers = {
+    domain_name = var.domain_name
+    acm_certificate_arn = module.acm.certificate_arn
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Ansibleディレクトリに移動
+      cd ansible
+      
+      # SSL証明書の設定
+      echo "SSL証明書の設定を開始中..."
+      if ansible-playbook -i inventory/hosts.yml playbooks/ssl_setup.yml; then
+        echo "✓ SSL証明書の設定が完了しました"
+      else
+        echo "✗ SSL証明書の設定に失敗しました"
+        exit 1
+      fi
+      
+      # 元のディレクトリに戻る
+      cd ..
+      
+      # SSL設定の検証
+      echo "SSL設定を検証中..."
+      if ./scripts/validate-ssl-setup.sh; then
+        echo "✓ SSL設定の検証が完了しました"
+      else
+        echo "警告: SSL設定の検証に失敗しました"
+      fi
+    EOT
+  }
+
+  depends_on = [module.acm, null_resource.wordpress_setup]
+}
+
+# -----------------------------------------------------------------------------
+# Environment Testing Resource
+# -----------------------------------------------------------------------------
+
+resource "null_resource" "environment_test" {
+  triggers = {
+    wordpress_public_ip = module.ec2.public_ip
+    domain_name = var.domain_name
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "環境テストを開始中..."
+      
+      # WordPress環境のテスト
+      if [ -f "./scripts/test_environment.sh" ]; then
+        echo "WordPress環境をテスト中..."
+        ./scripts/test_environment.sh
+      fi
+      
+      # 監視設定のテスト
+      if [ -f "./scripts/test_monitoring.sh" ]; then
+        echo "監視設定をテスト中..."
+        ./scripts/test_monitoring.sh
+      fi
+      
+      # デプロイメントテスト
+      if [ -f "./scripts/deployment/test_environment.sh" ]; then
+        echo "デプロイメント環境をテスト中..."
+        ./scripts/deployment/test_environment.sh
+      fi
+      
+      echo "✓ 環境テストが完了しました"
+    EOT
+  }
+
+  depends_on = [null_resource.ssl_setup]
+}
+
+# -----------------------------------------------------------------------------
 # Infrastructure Summary
 # -----------------------------------------------------------------------------
 

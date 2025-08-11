@@ -99,6 +99,32 @@ if [ ! -f ~/.ssh/id_rsa ]; then
     log "SSH鍵を設定しました"
 fi
 
+# SSH設定ファイルの更新
+log "SSH設定ファイルを更新中..."
+WORDPRESS_IP=$(terraform output -raw wordpress_public_ip 2>/dev/null || echo "")
+if [ -n "$WORDPRESS_IP" ]; then
+    # 既存の設定をチェック
+    if ! grep -q "Host wordpress-server" ~/.ssh/config 2>/dev/null; then
+        cat >> ~/.ssh/config << EOF
+
+Host wordpress-server
+  HostName $WORDPRESS_IP
+  User ec2-user
+  IdentityFile ~/.ssh/id_rsa
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+  ServerAliveInterval 60
+  ServerAliveCountMax 3
+EOF
+        chmod 600 ~/.ssh/config
+        log "SSH設定ファイルを更新しました"
+    else
+        log "SSH設定ファイルは既に設定済みです"
+    fi
+else
+    log "警告: WordPressサーバーのIPアドレスを取得できませんでした"
+fi
+
 # AWS認証情報の確認
 log "AWS認証情報を確認中..."
 if ! aws sts get-caller-identity &> /dev/null; then
