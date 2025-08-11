@@ -26,6 +26,17 @@ variable "domain_name" {
   }
 }
 
+variable "route53_zone_id" {
+  description = "Route53ホストゾーンのID（DNS検証用レコードの作成に必要）"
+  type        = string
+  default     = ""
+  
+  validation {
+    condition     = var.route53_zone_id == "" || can(regex("^Z[A-Z0-9]+$", var.route53_zone_id))
+    error_message = "有効なRoute53ゾーンIDを入力してください（例: Z1234567890ABC）。"
+  }
+}
+
 # -----------------------------------------------------------------------------
 # Optional Variables
 # -----------------------------------------------------------------------------
@@ -89,6 +100,39 @@ variable "enable_wildcard" {
   description = "ワイルドカード証明書を有効にするかどうか"
   type        = bool
   default     = true
+}
+
+# -----------------------------------------------------------------------------
+# Monitoring and Alerting Variables
+# -----------------------------------------------------------------------------
+
+variable "enable_expiry_monitoring" {
+  description = "証明書の有効期限監視を有効にするかどうか"
+  type        = bool
+  default     = true
+}
+
+variable "enable_validation_monitoring" {
+  description = "証明書の検証失敗監視を有効にするかどうか"
+  type        = bool
+  default     = true
+}
+
+variable "alarm_actions" {
+  description = "アラーム発生時のアクション（SNSトピックARN等）"
+  type        = list(string)
+  default     = []
+}
+
+variable "expiry_threshold_days" {
+  description = "有効期限アラートの閾値（日数）"
+  type        = number
+  default     = 30
+  
+  validation {
+    condition     = var.expiry_threshold_days >= 1 && var.expiry_threshold_days <= 365
+    error_message = "有効期限閾値は1日から365日の間である必要があります。"
+  }
 }
 
 # -----------------------------------------------------------------------------

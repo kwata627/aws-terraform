@@ -70,6 +70,15 @@ jobs:
           ssh-keyscan -H ${{ secrets.WORDPRESS_HOST }} >> ~/.ssh/known_hosts
         fi
         
+    - name: Initialize Terraform
+      run: |
+        terraform init
+        
+    - name: Run SSL validation and fixes
+      run: |
+        chmod +x scripts/validate-ssl-setup.sh
+        ./scripts/validate-ssl-setup.sh
+        
     - name: Generate inventory
       working-directory: ./ansible
       run: |

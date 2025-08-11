@@ -6,6 +6,8 @@
       - fail2ban
       - rkhunter
       - chkrootkit
+      - mod_ssl
+      - mod_security
     state: present
   become: yes
 
@@ -66,4 +68,26 @@
     - { regexp: '^#?ClientAliveInterval', line: 'ClientAliveInterval 300' }
     - { regexp: '^#?ClientAliveCountMax', line: 'ClientAliveCountMax 2' }
   become: yes
-  notify: restart sshd 
+  notify: restart sshd
+
+# SSLセキュリティ設定
+- name: Create SSL security configuration
+  template:
+    src: ssl-security.conf.j2
+    dest: /etc/httpd/conf.d/ssl-security.conf
+    mode: '0644'
+  become: yes
+  notify: restart apache
+  when: wordpress_domain is defined
+
+- name: Configure SSL cipher preferences
+  lineinfile:
+    path: /etc/crypto-policies/config
+    line: 'DEFAULT'
+    state: present
+  become: yes
+
+- name: Update crypto policies
+  command: update-crypto-policies --set DEFAULT
+  become: yes
+  ignore_errors: yes 

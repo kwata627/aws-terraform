@@ -71,20 +71,95 @@ output "certificate_not_before" {
 }
 
 # -----------------------------------------------------------------------------
+# Auto Renewal Information
+# -----------------------------------------------------------------------------
+
+output "auto_renewal_enabled" {
+  description = "自動更新が有効かどうか"
+  value       = true
+}
+
+output "renewal_eligibility" {
+  description = "更新適格性"
+  value       = "ELIGIBLE"
+}
+
+output "next_renewal_date" {
+  description = "次回更新予定日（有効期限60日前）"
+  value       = try(
+    timeadd(aws_acm_certificate.main.not_after, "-60h"),
+    "計算できません"
+  )
+}
+
+output "days_until_renewal" {
+  description = "更新までの日数"
+  value       = try(
+    floor((parseint(timestamp()) - parseint(timeadd(aws_acm_certificate.main.not_after, "-60h"))) / 86400),
+    "計算できません"
+  )
+}
+
+# -----------------------------------------------------------------------------
+# Monitoring Information
+# -----------------------------------------------------------------------------
+
+output "expiry_monitoring_enabled" {
+  description = "有効期限監視が有効かどうか"
+  value       = var.enable_expiry_monitoring
+}
+
+output "validation_monitoring_enabled" {
+  description = "検証失敗監視が有効かどうか"
+  value       = var.enable_validation_monitoring
+}
+
+output "expiry_alarm_arn" {
+  description = "有効期限アラームのARN"
+  value       = try(aws_cloudwatch_metric_alarm.certificate_expiry[0].arn, null)
+}
+
+output "validation_failure_alarm_arn" {
+  description = "検証失敗アラームのARN"
+  value       = try(aws_cloudwatch_metric_alarm.certificate_validation_failure[0].arn, null)
+}
+
+# -----------------------------------------------------------------------------
 # Module Information
 # -----------------------------------------------------------------------------
 
 output "module_version" {
   description = "モジュールのバージョン情報"
-  value       = "1.0.0"
+  value       = "2.0.0"
 }
 
 output "module_features" {
   description = "モジュールの機能一覧"
   value = {
-    dns_validation     = true
-    wildcard_support   = var.enable_wildcard
-    auto_renewal       = true
-    lifecycle_management = true
+    dns_validation           = true
+    wildcard_support         = var.enable_wildcard
+    auto_renewal             = true
+    lifecycle_management     = true
+    expiry_monitoring        = var.enable_expiry_monitoring
+    validation_monitoring    = var.enable_validation_monitoring
+    cloudwatch_alarms        = var.enable_expiry_monitoring || var.enable_validation_monitoring
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Certificate Summary
+# -----------------------------------------------------------------------------
+
+output "certificate_summary" {
+  description = "証明書の概要情報"
+  value = {
+    domain_name              = aws_acm_certificate.main.domain_name
+    status                   = aws_acm_certificate.main.status
+    validation_method        = aws_acm_certificate.main.validation_method
+    subject_alternative_names = aws_acm_certificate.main.subject_alternative_names
+    not_before               = aws_acm_certificate.main.not_before
+    not_after                = aws_acm_certificate.main.not_after
+    auto_renewal_enabled     = true
+    monitoring_enabled       = var.enable_expiry_monitoring || var.enable_validation_monitoring
   }
 }

@@ -51,27 +51,7 @@ variable "cloudfront_domain_name" {
   
   validation {
     condition     = var.cloudfront_domain_name == "" || can(regex("^[a-zA-Z0-9.-]+\\.cloudfront\\.net$", var.cloudfront_domain_name))
-    error_message = "有効なCloudFrontドメイン名を指定してください（例: d1234567890.cloudfront.net）。"
-  }
-}
-
-variable "certificate_validation_records" {
-  description = "ACM証明書検証用のDNSレコード情報"
-  type = map(object({
-    name   = string
-    record = string
-    type   = string
-  }))
-  default = {}
-  
-  validation {
-    condition = alltrue([
-      for key, record in var.certificate_validation_records : 
-      length(record.name) > 0 &&
-      length(record.record) > 0 &&
-      contains(["A", "AAAA", "CNAME", "TXT"], record.type)
-    ])
-    error_message = "証明書検証レコードの形式が正しくありません。"
+    error_message = "有効なCloudFrontドメイン名を入力してください（例: d1234567890abc.cloudfront.net）。"
   }
 }
 

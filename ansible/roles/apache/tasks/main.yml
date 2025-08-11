@@ -36,6 +36,19 @@
     state: absent
   become: yes
 
+# SSL設定の追加
+- name: Include SSL setup tasks
+  include_tasks: ssl_setup.yml
+  when: wordpress_domain is defined
+
+- name: Open HTTPS port in firewall
+  firewalld:
+    port: '443/tcp'
+    permanent: yes
+    state: enabled
+  become: yes
+  notify: restart firewalld
+
 - name: Enable and start Apache service
   service:
     name: httpd

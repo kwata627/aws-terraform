@@ -317,20 +317,6 @@ resource "aws_route53_record" "cloudfront" {
   # Route53レコードではタグは使用できないため削除
 }
 
-# ACM証明書検証用レコード
-resource "aws_route53_record" "cert_validation" {
-  for_each = var.certificate_validation_records
-
-  allow_overwrite = true
-  name            = each.value.name
-  records         = [each.value.record]
-  ttl             = 60
-  type            = each.value.type
-  zone_id         = aws_route53_zone.main.zone_id
-
-  # Route53レコードではタグは使用できないため削除
-}
-
 # 追加のDNSレコード
 resource "aws_route53_record" "additional" {
   for_each = { for idx, record in var.dns_records : idx => record }

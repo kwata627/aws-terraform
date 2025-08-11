@@ -1,0 +1,188 @@
+name: Certificate Monitoring
+
+on:
+  schedule:
+    # 毎週月曜日午前9時（JST）に実行
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      domain_name:
+        description: '監視するドメイン名'
+        required: false
+        default: ''
+      certificate_arn:
+        description: '証明書ARN'
+        required: false
+        default: ''
+
+jobs:
+  certificate-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1  # ACM証明書はus-east-1にあります
+          
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+          
+      - name: Initialize Terraform
+        run: |
+          terraform init
+          
+      - name: Get certificate information
+        id: get-cert-info
+        run: |
+          # Terraform出力から証明書情報を取得
+          CERT_ARN=$(terraform output -raw acm_certificate_arn 2>/dev/null || echo "")
+          DOMAIN_NAME=$(terraform output -raw acm_certificate_domain_name 2>/dev/null || echo "")
+          
+          # 手動入力がある場合は上書き
+          if [ -n "${{ github.event.inputs.certificate_arn }}" ]; then
+            CERT_ARN="${{ github.event.inputs.certificate_arn }}"
+          fi
+          if [ -n "${{ github.event.inputs.domain_name }}" ]; then
+            DOMAIN_NAME="${{ github.event.inputs.domain_name }}"
+          fi
+          
+          echo "cert_arn=$CERT_ARN" >> $GITHUB_OUTPUT
+          echo "domain_name=$DOMAIN_NAME" >> $GITHUB_OUTPUT
+          
+          if [ -z "$CERT_ARN" ]; then
+            echo "ERROR: 証明書ARNを取得できませんでした"
+            exit 1
+          fi
+          if [ -z "$DOMAIN_NAME" ]; then
+            echo "ERROR: ドメイン名を取得できませんでした"
+            exit 1
+          fi
+          
+          echo "証明書ARN: $CERT_ARN"
+          echo "ドメイン名: $DOMAIN_NAME"
+          
+      - name: Check certificate status
+        id: check-cert
+        run: |
+          CERT_ARN="${{ steps.get-cert-info.outputs.cert_arn }}"
+          DOMAIN_NAME="${{ steps.get-cert-info.outputs.domain_name }}"
+          
+          # 証明書の詳細情報を取得
+          CERT_INFO=$(aws acm describe-certificate \
+            --certificate-arn "$CERT_ARN" \
+            --region us-east-1 \
+            --query 'Certificate.{Status:Status,DomainName:DomainName,NotAfter:NotAfter,RenewalEligibility:RenewalEligibility}' \
+            --output json)
+          
+          echo "証明書情報: $CERT_INFO"
+          
+          # ステータスを取得
+          STATUS=$(echo "$CERT_INFO" | jq -r '.Status')
+          RENEWAL_ELIGIBILITY=$(echo "$CERT_INFO" | jq -r '.RenewalEligibility')
+          NOT_AFTER=$(echo "$CERT_INFO" | jq -r '.NotAfter')
+          
+          echo "ステータス: $STATUS"
+          echo "更新適格性: $RENEWAL_ELIGIBILITY"
+          echo "有効期限: $NOT_AFTER"
+          
+          # 有効期限までの日数を計算
+          CURRENT_DATE=$(date +%s)
+          EXPIRY_DATE=$(date -d "$NOT_AFTER" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S%z" "$NOT_AFTER" +%s 2>/dev/null)
+          DAYS_UNTIL_EXPIRY=$(( (EXPIRY_DATE - CURRENT_DATE) / 86400 ))
+          
+          echo "有効期限まで: $DAYS_UNTIL_EXPIRY 日"
+          
+          # 結果を出力
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "renewal_eligibility=$RENEWAL_ELIGIBILITY" >> $GITHUB_OUTPUT
+          echo "days_until_expiry=$DAYS_UNTIL_EXPIRY" >> $GITHUB_OUTPUT
+          echo "not_after=$NOT_AFTER" >> $GITHUB_OUTPUT
+          
+          # アラート条件のチェック
+          ALERT_NEEDED=false
+          ALERT_MESSAGE=""
+          
+          if [ "$STATUS" != "ISSUED" ]; then
+            ALERT_NEEDED=true
+            ALERT_MESSAGE="証明書が発行されていません（ステータス: $STATUS）"
+          elif [ "$RENEWAL_ELIGIBILITY" != "ELIGIBLE" ]; then
+            ALERT_NEEDED=true
+            ALERT_MESSAGE="証明書の自動更新が適格ではありません（$RENEWAL_ELIGIBILITY）"
+          elif [ "$DAYS_UNTIL_EXPIRY" -le 0 ]; then
+            ALERT_NEEDED=true
+            ALERT_MESSAGE="証明書が期限切れです！"
+          elif [ "$DAYS_UNTIL_EXPIRY" -le 30 ]; then
+            ALERT_NEEDED=true
+            ALERT_MESSAGE="証明書の有効期限が30日以内です（残り $DAYS_UNTIL_EXPIRY 日）"
+          fi
+          
+          echo "alert_needed=$ALERT_NEEDED" >> $GITHUB_OUTPUT
+          echo "alert_message=$ALERT_MESSAGE" >> $GITHUB_OUTPUT
+          
+      - name: Send alert notification
+        if: steps.check-cert.outputs.alert_needed == 'true'
+        run: |
+          ALERT_MESSAGE="${{ steps.check-cert.outputs.alert_message }}"
+          DOMAIN_NAME="${{ steps.get-cert-info.outputs.domain_name }}"
+          DAYS_UNTIL_EXPIRY="${{ steps.check-cert.outputs.days_until_expiry }}"
+          
+          echo "🚨 SSL証明書アラート 🚨"
+          echo "ドメイン: $DOMAIN_NAME"
+          echo "問題: $ALERT_MESSAGE"
+          echo "有効期限まで: $DAYS_UNTIL_EXPIRY 日"
+          echo ""
+          echo "対応が必要です:"
+          echo "1. 証明書の更新状況を確認"
+          echo "2. DNS検証レコードの確認"
+          echo "3. 必要に応じて手動対応"
+          
+          # ここでSlack、メール、SNS等の通知処理を追加
+          # 例: Slack通知
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data "{\"text\":\"🚨 SSL証明書アラート: $ALERT_MESSAGE\"}" \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}
+          
+      - name: Upload check results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: certificate-check-results
+          path: |
+            certificate-renewal-check.log
+            terraform_output.json
+          retention-days: 30
+          
+      - name: Create issue for alert
+        if: steps.check-cert.outputs.alert_needed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: ['certificate-alert']
+            });
+            
+            // 同じドメインの既存のアラートがあるかチェック
+            const existingIssue = issues.find(issue => 
+              issue.title.includes('${{ steps.get-cert-info.outputs.domain_name }}')
+            );
+            
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '🚨 SSL証明書アラート: ${{ steps.get-cert-info.outputs.domain_name }}',
+                body: 'SSL証明書の問題が検出されました。詳細はワークフローのログを確認してください。',
+                labels: ['certificate-alert', 'security', 'urgent']
+              });
+            }

@@ -66,7 +66,7 @@ output "registered_domain_name" {
 
 output "dns_records_created" {
   description = "作成されたDNSレコードの数"
-  value       = length(var.dns_records) + (var.wordpress_ip != "" ? 1 : 0) + (var.cloudfront_domain_name != "" ? 1 : 0) + length(var.certificate_validation_records)
+  value       = length(var.dns_records) + (var.wordpress_ip != "" ? 1 : 0) + (var.cloudfront_domain_name != "" ? 1 : 0)
 }
 
 output "wordpress_record_name" {
@@ -87,11 +87,6 @@ output "cloudfront_record_name" {
 output "cloudfront_record_created" {
   description = "CloudFront用CNAMEレコードが作成されたかどうか"
   value       = var.cloudfront_domain_name != ""
-}
-
-output "cert_validation_records_created" {
-  description = "作成された証明書検証レコードの数"
-  value       = length(var.certificate_validation_records)
 }
 
 output "additional_records_created" {
@@ -209,7 +204,7 @@ output "module_summary" {
     query_logging_enabled = var.enable_query_logging
     health_checks_enabled = var.enable_health_checks
     domain_registered = var.register_domain
-    total_records = length(var.dns_records) + (var.wordpress_ip != "" ? 1 : 0) + (var.cloudfront_domain_name != "" ? 1 : 0) + length(var.certificate_validation_records)
+    total_records = length(var.dns_records) + (var.wordpress_ip != "" ? 1 : 0) + (var.cloudfront_domain_name != "" ? 1 : 0)
     total_health_checks = var.enable_health_checks ? length(var.health_checks) : 0
     vpc_associations = var.is_private_zone ? length(var.private_zone_vpc_ids) : 0
   }

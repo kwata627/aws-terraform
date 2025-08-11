@@ -71,6 +71,22 @@ define( 'DISALLOW_FILE_EDIT', {{ wordpress_disallow_file_edit | default('true') 
  */
 define( 'DISALLOW_FILE_MODS', {{ wordpress_disallow_file_mods | default('true') }} );
 
+/**
+ * SSL設定
+ */
+{% if wordpress_force_ssl | default(false) %}
+define( 'FORCE_SSL_ADMIN', {{ wordpress_ssl_admin | default('true') }} );
+define( 'FORCE_SSL_LOGIN', true );
+{% endif %}
+
+/**
+ * WordPress URL設定
+ */
+{% if wordpress_domain is defined %}
+define( 'WP_HOME', 'https://{{ wordpress_domain }}' );
+define( 'WP_SITEURL', 'https://{{ wordpress_domain }}' );
+{% endif %}
+
 /* 追加設定値は「さくらのマニュアル」をご利用ください。 */
 
 /** Absolute path to the WordPress directory. */

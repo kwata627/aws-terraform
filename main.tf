@@ -218,9 +218,14 @@ module "acm" {
   domain_name = local.domain_config.domain_name
   environment = local.environment_config.name
   
+  # Route53ゾーンID（DNS検証用レコードの作成に必要）
+  route53_zone_id = module.route53.zone_id
+  
   providers = {
     aws = aws.us_east_1
   }
+  
+  depends_on = [module.route53]
 }
 
 # -----------------------------------------------------------------------------
@@ -249,7 +254,7 @@ module "route53" {
   domain_name = local.domain_config.domain_name
   wordpress_ip = module.ec2.public_ip
   # cloudfront_domain_name = module.cloudfront.domain_name # 一時的に無効化
-  certificate_validation_records = module.acm.validation_records
+  # certificate_validation_records = module.acm.validation_records # ACMモジュールで自動作成するため削除
   
   # ドメイン登録設定
   register_domain = local.domain_config.register_domain

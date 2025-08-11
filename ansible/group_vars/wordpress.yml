@@ -27,6 +27,10 @@ wordpress_automatic_updater_disabled: true
 wordpress_disallow_file_edit: true
 wordpress_disallow_file_mods: true
 
+# SSL設定
+wordpress_force_ssl: true
+wordpress_ssl_admin: true
+
 # 監視設定
 monitoring_interval_hours: 6
 disk_usage_threshold: 80
