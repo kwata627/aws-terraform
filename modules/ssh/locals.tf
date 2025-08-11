@@ -16,7 +16,6 @@ locals {
       ManagedBy   = "terraform"
       Project     = var.project
       Security    = "high"
-      CreatedAt   = timestamp()
       Version     = "2.0.0"
     },
     var.tags

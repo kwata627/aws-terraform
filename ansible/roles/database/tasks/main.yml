@@ -1,18 +1,44 @@
 ---
 # データベース接続設定タスク
-- name: Install MySQL client
+- name: Install MariaDB client for Amazon Linux 2
+  yum:
+    name: mariadb105
+    state: present
+  become: yes
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version == "2"
+  ignore_errors: yes
+
+- name: Install MariaDB client for Amazon Linux 2023
   dnf:
-    name: mysql
+    name: mariadb105
+    state: present
+  become: yes
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version == "2023"
+  ignore_errors: yes
+
+- name: Install MariaDB client (fallback)
+  dnf:
+    name: mariadb105
+    state: present
+  become: yes
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version is not defined
+  ignore_errors: yes
+
+- name: Verify MariaDB client installation
+  command: mysql --version
+  register: mariadb_version
+  ignore_errors: yes
+
+- name: Display MariaDB client version
+  debug:
+    msg: "MariaDB client version: {{ mariadb_version.stdout if mariadb_version.rc == 0 else 'Not installed' }}"
+
+- name: Install PyMySQL for Python 3
+  pip:
+    name: PyMySQL
     state: present
   become: yes
   ignore_errors: yes
-
-- name: Install MySQL client (alternative package name)
-  dnf:
-    name: mysql-community-client
-    state: present
-  become: yes
-  when: ansible_failed is defined and ansible_failed
 
 - name: Create MySQL configuration directory
   file:
@@ -28,10 +54,16 @@
     mode: '0644'
   become: yes
 
+- name: Extract RDS host and port
+  set_fact:
+    rds_host: "{{ (rds_endpoint | default('')).split(':')[0] }}"
+    rds_port: "{{ (rds_endpoint | default('')).split(':')[1] | default('3306') }}"
+
 - name: Test database connection
   mysql_query:
     login_db: "{{ wordpress_db_name }}"
-    login_host: "{{ wordpress_db_host }}"
+    login_host: "{{ rds_host | default(wordpress_db_host) }}"
+    login_port: "{{ rds_port | default('3306') }}"
     login_user: "{{ wordpress_db_user }}"
     login_password: "{{ wordpress_db_password }}"
     query: "SELECT 1"
@@ -40,4 +72,14 @@
 
 - name: Display database connection status
   debug:
-    msg: "Database connection: {{ 'SUCCESS' if db_test is success else 'FAILED' }}" 
+    msg: "Database connection: {{ 'SUCCESS' if db_test is success else 'FAILED' }}"
+    verbosity: 1
+
+- name: Display RDS connection details
+  debug:
+    msg: |
+      RDS Endpoint: {{ rds_endpoint | default('Not set') }}
+      Database Host: {{ wordpress_db_host | default('Not set') }}
+      Database Name: {{ wordpress_db_name | default('Not set') }}
+      Database User: {{ wordpress_db_user | default('Not set') }}
+    verbosity: 1 

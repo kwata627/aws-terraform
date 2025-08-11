@@ -44,8 +44,8 @@ root_volume_size = 8
 # -----------------------------------------------------------------------------
 
 rds_identifier = "wp-shamo-rds"
-db_password = "your-secure-password-here"
-snapshot_date = "20250804"
+db_password = "bre@dhouse"
+snapshot_date = ""
 
 # -----------------------------------------------------------------------------
 # S3 Configuration
@@ -57,21 +57,21 @@ s3_bucket_name = "wp-shamo-s3"
 # Domain Configuration
 # -----------------------------------------------------------------------------
 
-domain_name = "shamonooyuuhan.com"
-register_domain = false  # 既存ドメインのためfalseに設定
+domain_name = "shamolife.com"
+register_domain = false  # 自動判定されるため、通常はfalseのまま
 
 # ドメイン登録者情報
 registrant_info = {
-  first_name        = "watanabe"
-  last_name         = "kazuki"
-  organization_name = "My Organization"
+  first_name        = "kazuki"
+  last_name         = "watanabe"
+  organization_name = "Personal"
   email            = "wata2watter0903@gmail.com"
   phone_number     = "+81.80-4178-3008"
-  address_line_1   = "123 Main Street"
-  city             = "Niigata"
+  address_line_1   = "2-17-11"
+  city             = "Niigata-shi, Chuo-ku"
   state            = "Niigata"
   country_code     = "JP"
-  zip_code         = "100-0001"
+  zip_code         = "9500915"
 }
 
 # -----------------------------------------------------------------------------

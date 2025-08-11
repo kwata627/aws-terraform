@@ -1,0 +1,66 @@
+---
+# WordPress デバッグ無効化プレイブック
+- name: Disable WordPress Debug Mode
+  hosts: wordpress
+  become: yes
+  vars:
+    wordpress_debug: false
+    wordpress_debug_log: false
+    wordpress_debug_display: false
+    php_display_errors: Off
+    php_log_errors: On
+  
+  roles:
+    - apache
+  
+  tasks:
+    - name: Restore wp-config.php from backup
+      copy:
+        src: /var/www/html/wp-config.php.backup
+        dest: /var/www/html/wp-config.php
+        remote_src: yes
+        backup: yes
+      become: yes
+      when: ansible_check_mode is not defined
+
+    - name: Update wp-config.php with production settings
+      template:
+        src: ../roles/wordpress/templates/wp-config.php.j2
+        dest: /var/www/html/wp-config.php
+        owner: apache
+        group: apache
+        mode: '0644'
+      become: yes
+      vars:
+        wordpress_debug: false
+        wordpress_debug_log: false
+        wordpress_debug_display: false
+
+    - name: Update PHP configuration for production
+      template:
+        src: ../roles/php/templates/php.ini.j2
+        dest: /etc/php.ini
+        mode: '0644'
+      become: yes
+      vars:
+        php_display_errors: Off
+        php_log_errors: On
+      notify: restart apache
+
+    - name: Remove debug.log file
+      file:
+        path: /var/www/html/wp-content/debug.log
+        state: absent
+      become: yes
+
+    - name: Restart Apache to apply changes
+      service:
+        name: httpd
+        state: restarted
+      become: yes
+
+    - name: Display completion message
+      debug:
+        msg: |
+          WordPress デバッグが無効になりました。
+          本番環境設定に戻しました。

@@ -76,7 +76,7 @@ variable "certificate_validation_records" {
 }
 
 variable "register_domain" {
-  description = "ドメイン登録を実行するかどうか"
+  description = "ドメイン登録を実行するかどうか（自動判定されるため、通常は変更不要）"
   type        = bool
   default     = false
 }
@@ -113,16 +113,16 @@ variable "registrant_info" {
     condition = alltrue([
       length(var.registrant_info.first_name) > 0,
       length(var.registrant_info.last_name) > 0,
-      length(var.registrant_info.organization_name) > 0,
       can(regex("^[^@]+@[^@]+\\.[^@]+$", var.registrant_info.email)),
       length(var.registrant_info.phone_number) > 0,
+      can(regex("^\\+[0-9]+\\.[0-9-]+$", var.registrant_info.phone_number)),
       length(var.registrant_info.address_line_1) > 0,
       length(var.registrant_info.city) > 0,
       length(var.registrant_info.state) > 0,
-      length(var.registrant_info.country_code) == 2,
+      var.registrant_info.country_code == "JP",
       length(var.registrant_info.zip_code) > 0
     ])
-    error_message = "登録者情報の形式が正しくありません。"
+    error_message = "登録者情報の形式が正しくありません。電話番号は +81.80-4178-3008 の形式で、国コードは JP である必要があります。組織名は空でも構いません。"
   }
 }
 

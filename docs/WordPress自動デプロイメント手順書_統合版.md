@@ -4,7 +4,7 @@
 1. [概要](#概要)
 2. [システム構成](#システム構成)
 3. [初期設定](#初期設定)
-4. [GitHub Actions設定](#github-actions設定)
+4. [設定ファイル](#設定ファイル)
 5. [デプロイメントフロー](#デプロイメントフロー)
 6. [ロールバック機能](#ロールバック機能)
 7. [ログとモニタリング](#ログとモニタリング)
@@ -16,7 +16,7 @@
 
 ## 概要
 
-このシステムは、GitHub Actionsを使用して検証環境でのテスト後に本番環境に自動的にWordPressコンテンツを反映させる自動デプロイメントシステムです。スナップショットを活用して安全な更新プロセスを実現します。
+このシステムは、検証環境でのテスト後に本番環境に自動的にWordPressコンテンツを反映させる自動デプロイメントシステムです。スナップショットを活用して安全な更新プロセスを実現します。
 
 ### デプロイメントフロー
 ```
@@ -35,15 +35,14 @@
 ## システム構成
 
 ### 主要コンポーネント
-- **自動デプロイメントワークフロー**: `.github/workflows/auto-deployment.yml`
-- **ロールバックワークフロー**: `.github/workflows/rollback.yml`
-- **検証環境準備ワークフロー**: `.github/workflows/prepare-validation.yml`
-- **本番環境デプロイワークフロー**: `.github/workflows/deploy-to-production.yml`
+- **自動デプロイメントスクリプト**: `scripts/deployment/auto_deployment.sh`
+- **ロールバックスクリプト**: `scripts/maintenance/rollback.sh`
+- **検証環境準備スクリプト**: `scripts/deployment/prepare_validation.sh`
+- **本番環境デプロイスクリプト**: `scripts/deployment/deploy_to_production.sh`
 - **設定ファイル**: `deployment_config.json`
-- **GitHub Secrets**: 認証情報の安全な管理
+- **共通ライブラリ**: `scripts/lib/common.sh`
 
 ### 必要なツール
-- GitHub Actions（自動実行環境）
 - AWS CLI v2以上
 - jq（JSONパーサー）
 - MySQLクライアント
@@ -54,91 +53,35 @@
 
 ## 初期設定
 
-### 1. GitHub Secretsの設定
-
-GitHubリポジトリの **Settings** → **Secrets and variables** → **Actions** で以下のシークレットを設定してください：
-
-#### 必須シークレット
-- `AWS_ACCESS_KEY_ID`: AWSアクセスキーID
-- `AWS_SECRET_ACCESS_KEY`: AWSシークレットアクセスキー
-- `AWS_REGION`: AWSリージョン（例: `ap-northeast-1`）
-- `SSH_PRIVATE_KEY`: SSH秘密鍵
-- `WORDPRESS_HOST`: WordPressサーバーのIPアドレス
-
-#### オプションシークレット
-- `PRODUCTION_EC2_ID`: 本番EC2インスタンスID
-- `PRODUCTION_RDS_ID`: 本番RDS識別子
-- `VALIDATION_EC2_ID`: 検証用EC2インスタンスID
-- `VALIDATION_RDS_ID`: 検証用RDS識別子
-- `APPROVAL_SECRET`: デプロイメント承認用シークレット
-- `APPROVERS`: デプロイメント承認者（GitHubユーザー名、カンマ区切り）
-- `ROLLBACK_APPROVAL_SECRET`: ロールバック承認用シークレット
-- `ROLLBACK_APPROVERS`: ロールバック承認者（GitHubユーザー名、カンマ区切り）
-
-### 2. デプロイメントシステムの初期化
+### 1. システムの初期化
 
 ```bash
-# GitHub Actionsワークフローを手動実行
-# .github/workflows/setup-deployment.yml を実行
+# 初期設定スクリプトの実行
+./scripts/setup/initialize_deployment.sh
 ```
 
-このワークフローは以下を実行します：
-- 設定ファイルの生成
+このスクリプトは以下を実行します：
+- 必要なツールのインストール（jq、AWS CLI、MySQLクライアント）
+- 設定ファイルの作成
 - SSH鍵の設定
-- 環境検証
-- アーティファクトのアップロード
+- 実行権限の付与
 
-### 3. 環境テスト
+### 2. 環境テスト
 
 ```bash
-# GitHub Actionsワークフローを手動実行
-# .github/workflows/wordpress-setup.yml を実行
+# デプロイメントシステムのテスト
+./scripts/deployment/test_deployment.sh
 ```
 
----
+### 3. AWS認証情報の設定
 
-## GitHub Actions設定
+```bash
+# AWS認証情報の確認
+aws sts get-caller-identity
 
-### 利用可能なワークフロー
-
-#### 1. WordPress Environment Setup
-- **ファイル**: `.github/workflows/wordpress-setup.yml`
-- **目的**: WordPress環境の構築と設定
-- **トリガー**: 手動実行、Ansibleファイル変更
-- **機能**: 
-  - インベントリの自動生成
-  - 接続テスト
-  - Ansibleプレイブックの実行
-  - WordPressサイトの動作確認
-
-#### 2. Auto Deployment
-- **ファイル**: `.github/workflows/auto-deployment.yml`
-- **目的**: 検証環境でのテスト後に本番環境への自動デプロイ
-- **トリガー**: WordPressコンテンツ変更、手動実行
-- **機能**:
-  - 本番環境のスナップショット作成
-  - 検証環境の起動と復元
-  - 検証環境でのテスト実行
-  - 承認フロー（手動/自動）
-  - 本番環境への反映
-  - 検証環境のクリーンアップ
-
-#### 3. Rollback Deployment
-- **ファイル**: `.github/workflows/rollback.yml`
-- **目的**: 問題発生時の本番環境のロールバック
-- **トリガー**: 手動実行
-- **機能**:
-  - ロールバック前のバックアップ作成
-  - 指定したスナップショットからの復元
-  - ロールバック後の動作確認
-  - 承認フロー（手動/自動）
-
-### 使用方法
-
-#### GitHub Actionsでの実行
-1. **手動実行**: GitHubリポジトリのActionsタブから実行
-2. **自動実行**: コードプッシュ時に自動実行
-3. **承認フロー**: 設定に応じて手動承認が必要
+# 認証情報の設定（必要な場合）
+aws configure
+```
 
 ---
 
@@ -154,8 +97,7 @@ GitHubリポジトリの **Settings** → **Secrets and variables** → **Action
         "wordpress_url": "https://example.com",
         "backup_retention_days": 7,
         "ssh_user": "ec2-user",
-        "ssh_key_path": "~/.ssh/id_rsa",
-        "db_password": "your-secure-password-here"
+        "ssh_key_path": "~/.ssh/id_rsa"
     },
     "validation": {
         "ec2_instance_id": "i-yyyyyyyyyyyyyyyyy",
@@ -163,8 +105,7 @@ GitHubリポジトリの **Settings** → **Secrets and variables** → **Action
         "wordpress_url": "http://validation-ip",
         "test_timeout_minutes": 30,
         "ssh_user": "ec2-user",
-        "ssh_key_path": "~/.ssh/id_rsa",
-        "db_password": "your-secure-password-here"
+        "ssh_key_path": "~/.ssh/id_rsa"
     },
     "deployment": {
         "auto_approve": false,
@@ -181,32 +122,32 @@ GitHubリポジトリの **Settings** → **Secrets and variables** → **Action
 }
 ```
 
+**注意**: 実際の使用時は、このファイルをコピーして `deployment_config.json` として使用し、適切な値を設定してください。
+
 ### 設定項目の説明
 
 #### production（本番環境）
 - `ec2_instance_id`: 本番EC2インスタンスID
 - `rds_identifier`: 本番RDS識別子
-- `wordpress_url`: WordPressサイトのURL
+- `wordpress_url`: 本番WordPressサイトのURL
 - `backup_retention_days`: バックアップ保持日数
 - `ssh_user`: SSH接続ユーザー名
 - `ssh_key_path`: SSH秘密鍵のパス
-- `db_password`: データベースパスワード
 
 #### validation（検証環境）
-- `ec2_instance_id`: 検証用EC2インスタンスID
-- `rds_identifier`: 検証用RDS識別子
-- `wordpress_url`: 検証環境のWordPress URL
-- `test_timeout_minutes`: テストタイムアウト時間
+- `ec2_instance_id`: 検証EC2インスタンスID
+- `rds_identifier`: 検証RDS識別子
+- `wordpress_url`: 検証WordPressサイトのURL
+- `test_timeout_minutes`: テストタイムアウト（分）
 - `ssh_user`: SSH接続ユーザー名
 - `ssh_key_path`: SSH秘密鍵のパス
-- `db_password`: データベースパスワード
 
 #### deployment（デプロイメント設定）
-- `auto_approve`: 自動承認の有効/無効
-- `rollback_on_failure`: 失敗時の自動ロールバック
+- `auto_approve`: 自動承認（true/false）
+- `rollback_on_failure`: 失敗時のロールバック（true/false）
 - `notification_email`: 通知メールアドレス
-- `backup_before_deployment`: デプロイ前のバックアップ作成
-- `test_after_deployment`: デプロイ後のテスト実行
+- `backup_before_deployment`: デプロイ前バックアップ（true/false）
+- `test_after_deployment`: デプロイ後テスト（true/false）
 
 #### aws（AWS設定）
 - `region`: AWSリージョン
@@ -217,353 +158,307 @@ GitHubリポジトリの **Settings** → **Secrets and variables** → **Action
 
 ## デプロイメントフロー
 
-### 1. 手動デプロイメント
+### 基本的なデプロイメント実行
 
-#### GitHub Actionsでの実行
-1. GitHubリポジトリの **Actions** タブにアクセス
-2. **Auto Deployment** ワークフローを選択
-3. **Run workflow** をクリック
-4. 必要なパラメータを入力：
-   - `environment`: デプロイ対象環境（production）
-   - `auto_approve`: 自動承認の有効/無効
-   - `dry_run`: ドライランの有効/無効
-   - `backup_before_deployment`: デプロイ前バックアップの有効/無効
-5. **Run workflow** をクリックして実行開始
+```bash
+# 自動デプロイメントの実行
+./scripts/deployment/auto_deployment.sh
 
-#### 実行される処理
-1. **事前チェック**
-   - AWS認証情報の確認
-   - リソース存在確認
-   - 接続テスト
+# ドライラン（実際の変更なし）
+./scripts/deployment/auto_deployment.sh --dry-run
 
-2. **バックアップ作成**
-   - 本番環境のスナップショット作成
-   - バックアップの検証
+# ヘルプの表示
+./scripts/deployment/auto_deployment.sh --help
+```
 
-3. **検証環境準備**
-   - 検証環境の起動
-   - スナップショットからの復元
-   - 基本的な動作確認
+### デプロイメントプロセスの詳細
 
-4. **承認フロー**
-   - 自動承認の場合：即座に続行
-   - 手動承認の場合：承認者の確認待機
+#### ステップ1: 事前チェック
+- AWS認証情報の確認
+- 設定ファイルの検証
+- 必要なツールの確認
+- ネットワーク接続の確認
 
-5. **本番環境反映**
-   - 本番環境への変更反映
-   - 動作確認
-   - 検証環境のクリーンアップ
+#### ステップ2: スナップショット作成
+- 本番環境のRDSスナップショットを作成
+- タイムスタンプ付きで識別
+- スナップショットの作成完了を待機
 
-### 2. 自動デプロイメント
+#### ステップ3: 検証環境の起動
+- 検証用EC2インスタンスを起動
+- スナップショットから検証用RDSを復元
+- インスタンスの起動完了を待機
 
-#### トリガー設定
-- WordPressコンテンツの変更を検知
-- 特定のブランチへのプッシュ
-- スケジュール実行
+#### ステップ4: 検証環境の準備完了待機
+- EC2インスタンスの起動完了を待機
+- RDSインスタンスの利用可能状態を待機
+- WordPressサイトの起動完了を待機
 
-#### 実行条件
-- 検証環境でのテスト成功
-- 承認者の承認（設定による）
-- エラーチェックの通過
+#### ステップ5: 検証環境でのテスト
+- WordPressサイトの動作確認
+- 管理画面のアクセス確認
+- データベース接続確認
+- 基本的な機能テスト
+
+#### ステップ6: ユーザー確認
+- 自動承認でない場合、ユーザーの確認を求める
+- 確認後、本番環境への反映を実行
+
+#### ステップ7: 本番環境への反映
+- 本番環境のバックアップ作成
+- 検証環境から本番環境へのデータ同期
+- WordPressファイルの同期
+- 設定ファイルの同期
+
+#### ステップ8: 本番環境の動作確認
+- サイトの動作確認
+- 管理画面のアクセス確認
+- データベース接続確認
+- パフォーマンステスト
+
+#### ステップ9: 検証環境の停止
+- 検証用EC2インスタンスの停止
+- 検証用RDSインスタンスの停止
+- 一時リソースのクリーンアップ
+
+#### ステップ10: クリーンアップ
+- 一時ファイルの削除
+- ログファイルの保存
+- 通知の送信
 
 ---
 
 ## ロールバック機能
 
-### 1. 手動ロールバック
+デプロイメントが失敗した場合、ロールバックスクリプトを使用して本番環境を元の状態に戻すことができます：
 
-#### GitHub Actionsでの実行
-1. GitHubリポジトリの **Actions** タブにアクセス
-2. **Rollback Deployment** ワークフローを選択
-3. **Run workflow** をクリック
-4. 必要なパラメータを入力：
-   - `snapshot_id`: 復元するスナップショットID
-   - `force_rollback`: 強制ロールバックの有効/無効
-   - `backup_before_rollback`: ロールバック前バックアップの有効/無効
-5. **Run workflow** をクリックして実行開始
+```bash
+# ロールバックの実行
+./scripts/maintenance/rollback.sh
 
-#### 実行される処理
-1. **事前チェック**
-   - スナップショットの存在確認
-   - 本番環境の状態確認
+# 特定のスナップショットからロールバック
+./scripts/maintenance/rollback.sh --snapshot-id [スナップショットID]
+```
 
-2. **バックアップ作成**
-   - 現在の状態のバックアップ作成
-   - バックアップの検証
+### ロールバックプロセス
+1. 最新のスナップショットを取得
+2. 本番環境のRDSを停止
+3. スナップショットから復元
+4. WordPressファイルの復元
+5. 動作確認
 
-3. **承認フロー**
-   - 自動承認の場合：即座に続行
-   - 手動承認の場合：承認者の確認待機
-
-4. **ロールバック実行**
-   - 指定スナップショットからの復元
-   - 動作確認
-   - ロールバック結果の通知
-
-### 2. 自動ロールバック
-
-#### 条件
-- デプロイメント後のテスト失敗
-- 本番環境での動作異常検知
-- セキュリティ問題の検知
-
-#### 実行フロー
-1. 異常の検知
-2. 自動バックアップ作成
-3. 最新の正常スナップショットからの復元
-4. 復元後の動作確認
-5. 結果の通知
+### ロールバックの確認事項
+- [ ] データベースの復元完了
+- [ ] WordPressファイルの復元完了
+- [ ] サイトの動作確認
+- [ ] 管理画面のアクセス確認
 
 ---
 
 ## ログとモニタリング
 
-### 1. GitHub Actionsログ
+### ログファイル
+- デプロイメントログ: `logs/deployment_YYYYMMDD_HHMMSS.log`
+- ロールバックログ: `logs/rollback_YYYYMMDD_HHMMSS.log`
+- エラーログ: `logs/error_YYYYMMDD_HHMMSS.log`
 
-#### ログの確認方法
-1. GitHubリポジトリの **Actions** タブにアクセス
-2. 実行履歴から該当のワークフローを選択
-3. 各ジョブの詳細ログを確認
+### ログの確認
+```bash
+# 最新のデプロイメントログを確認
+tail -f logs/deployment_*.log
 
-#### 重要なログ項目
-- **認証情報**: AWS認証の成功/失敗
-- **リソース操作**: EC2/RDSの起動/停止/復元
-- **テスト結果**: 検証環境でのテスト結果
-- **エラー情報**: 発生したエラーの詳細
+# ロールバックログを確認
+tail -f logs/rollback_*.log
 
-### 2. AWS CloudWatchログ
+# エラーログを確認
+tail -f logs/error_*.log
+```
 
-#### 監視項目
-- **EC2メトリクス**: CPU使用率、メモリ使用率、ディスク使用率
-- **RDSメトリクス**: 接続数、クエリ実行時間、ストレージ使用率
-- **ネットワーク**: トラフィック量、エラー率
-- **セキュリティ**: セキュリティグループの変更、IAMアクセス
+### モニタリング
+```bash
+# デプロイメント状態の確認
+./scripts/deployment/check_deployment_status.sh
 
-#### アラート設定
-- **高負荷検知**: CPU使用率80%以上
-- **ディスク容量不足**: 使用率90%以上
-- **接続エラー**: 接続失敗率5%以上
-- **セキュリティ違反**: 不正アクセスの検知
-
-### 3. 通知設定
-
-#### 通知方法
-- **GitHub通知**: ワークフロー実行結果の通知
-- **メール通知**: 重要なイベントのメール通知
-- **Slack通知**: チームへの即座の通知
-
-#### 通知内容
-- **デプロイメント成功**: 正常完了の通知
-- **デプロイメント失敗**: エラー詳細の通知
-- **ロールバック実行**: ロールバック実行の通知
-- **セキュリティ警告**: セキュリティ問題の通知
+# リソース使用状況の確認
+./scripts/maintenance/check_resources.sh
+```
 
 ---
 
 ## セキュリティ考慮事項
 
-### 1. 認証情報の管理
+### 1. アクセス制御
+- AWS認証情報の適切な管理
+- SSH鍵の安全な保管
+- 最小権限の原則に従ったIAM設定
+- セキュリティグループの適切な設定
 
-#### GitHub Secrets
-- **機密情報**: AWS認証情報、SSH鍵、データベースパスワード
-- **アクセス制御**: リポジトリ管理者のみアクセス可能
-- **定期更新**: 認証情報の定期的な更新
+### 2. データ保護
+- 自動バックアップの作成
+- スナップショットの暗号化
+- 機密情報の適切な管理
+- 転送時の暗号化
 
-#### 最小権限の原則
-- **AWS IAM**: 必要最小限の権限のみ付与
-- **SSHアクセス**: 特定IPからのアクセスのみ許可
-- **データベース**: アプリケーションからのアクセスのみ許可
+### 3. 監査ログ
+- すべての操作のログ記録
+- 変更履歴の追跡
+- アクセスログの監視
+- セキュリティイベントの記録
 
-### 2. ネットワークセキュリティ
-
-#### VPC設定
-- **プライベートサブネット**: データベースの直接アクセス遮断
-- **セキュリティグループ**: 必要最小限のポートのみ開放
-- **NAT経由アクセス**: 検証環境への制限されたアクセス
-
-#### 通信暗号化
-- **HTTPS**: WordPressサイトの暗号化通信
-- **SSH**: サーバーアクセスの暗号化
-- **RDS**: データベース接続の暗号化
-
-### 3. データ保護
-
-#### バックアップ
-- **自動バックアップ**: RDSの自動バックアップ
-- **手動スナップショット**: デプロイメント前の手動バックアップ
-- **バックアップ暗号化**: すべてのバックアップの暗号化
-
-#### アクセス制御
-- **WordPress管理**: 強力なパスワードと二要素認証
-- **データベース**: アプリケーション専用ユーザー
-- **ファイルシステム**: 適切なファイル権限設定
+### 4. セキュリティベストプラクティス
+- 定期的なセキュリティ更新
+- 脆弱性スキャンの実施
+- セキュリティ監査の実施
+- インシデント対応計画の策定
 
 ---
 
 ## トラブルシューティング
 
-### 1. よくある問題と対処法
+### よくある問題と対処法
 
-#### AWS認証エラー
-```
-Error: The security token included in the request is invalid
-```
-**対処法**:
-1. GitHub SecretsのAWS認証情報を確認
-2. AWS認証情報の有効性を確認
-3. 必要に応じて新しい認証情報を生成
-
-#### SSH接続エラー
-```
-Permission denied (publickey)
-```
-**対処法**:
-1. GitHub SecretsのSSH秘密鍵を確認
-2. SSH鍵の権限設定を確認
-3. サーバーのSSH設定を確認
-
-#### リソース見つからないエラー
-```
-Error: The specified DB instance does not exist
-```
-**対処法**:
-1. GitHub Secretsのリソース識別子を確認
-2. AWSリソースの存在確認
-3. リージョンの設定確認
-
-#### 承認エラー
-```
-Error: Approval required
-```
-**対処法**:
-1. 承認者の設定確認
-2. 承認シークレットの確認
-3. 承認プロセスの確認
-
-### 2. デバッグ方法
-
-#### GitHub Actionsログの確認
-1. ワークフローの実行履歴を確認
-2. 各ステップの詳細ログを確認
-3. エラーメッセージの詳細を確認
-
-#### AWSリソースの確認
+#### 1. AWS認証情報エラー
 ```bash
-# EC2インスタンスの状態確認
-aws ec2 describe-instances --instance-ids i-xxxxxxxxx
+# AWS認証情報の確認
+aws sts get-caller-identity
 
-# RDSインスタンスの状態確認
-aws rds describe-db-instances --db-instance-identifier wp-example-rds
+# 認証情報の設定
+aws configure
+
+# プロファイルの確認
+aws configure list-profiles
+```
+
+#### 2. SSH接続エラー
+```bash
+# SSH鍵の確認
+ls -la ~/.ssh/id_rsa
+
+# SSH鍵の再設定
+terraform output -raw ssh_private_key > ~/.ssh/id_rsa
+chmod 600 ~/.ssh/id_rsa
+
+# SSH接続テスト
+ssh -i ~/.ssh/id_rsa ec2-user@[EC2_IP] "echo 'SSH接続成功'"
+```
+
+#### 3. データベース接続エラー
+```bash
+# RDSエンドポイントの確認
+aws rds describe-db-instances --db-instance-identifier wp-shamo-rds
 
 # セキュリティグループの確認
-aws ec2 describe-security-groups --group-ids sg-xxxxxxxxx
-```
-
-#### 手動での接続テスト
-```bash
-# SSH接続テスト
-ssh -i ~/.ssh/id_rsa ec2-user@[サーバーIP]
+aws ec2 describe-security-groups --group-ids [セキュリティグループID]
 
 # データベース接続テスト
-mysql -h [RDSエンドポイント] -u [ユーザー名] -p
+mysql -h [RDSエンドポイント] -u [ユーザー名] -p -e "SELECT 1;"
 ```
 
-### 3. 緊急時の対応
+#### 4. スナップショット作成エラー
+```bash
+# 利用可能なスナップショットの確認
+aws rds describe-db-snapshots --db-instance-identifier wp-example-rds
 
-#### ワークフローの停止
-1. GitHub Actionsで実行中のワークフローを停止
-2. 手動での状態確認
-3. 必要に応じて手動での復旧作業
+# 手動でスナップショットを作成
+aws rds create-db-snapshot --db-instance-identifier wp-example-rds --db-snapshot-identifier manual-snapshot-$(date +%Y%m%d)
 
-#### 手動でのロールバック
-1. 最新のスナップショットを確認
-2. 手動での復元作業
-3. 復元後の動作確認
+# スナップショットの状態確認
+aws rds describe-db-snapshots --db-snapshot-identifier [スナップショットID]
+```
+
+#### 5. デプロイメント中にエラーが発生
+```bash
+# ログの確認
+tail -f logs/deployment_*.log
+
+# 手動でのロールバック
+./scripts/maintenance/rollback.sh
+
+# 問題の特定と修正後、再度デプロイメント実行
+./scripts/deployment/auto_deployment.sh
+```
+
+#### 6. 検証環境が起動しない
+```bash
+# インスタンスの状態確認
+aws ec2 describe-instances --instance-ids [検証用EC2のID]
+
+# エラーログの確認
+aws ec2 get-console-output --instance-id [検証用EC2のID]
+
+# セキュリティグループの確認
+aws ec2 describe-security-groups --group-ids [セキュリティグループID]
+```
 
 ---
 
 ## ベストプラクティス
 
-### 1. デプロイメント前の準備
+### 1. デプロイメント前の確認
+- 設定ファイルの内容確認
+- 環境テストの実行
+- バックアップの確認
+- セキュリティ設定の確認
 
-#### チェックリスト
-- [ ] 本番環境のバックアップが作成されている
-- [ ] 検証環境でのテストが完了している
-- [ ] 承認者が設定されている
-- [ ] 通知設定が有効になっている
-- [ ] ロールバック手順が確認されている
+### 2. 段階的なデプロイメント
+- 小さな変更から開始
+- 各段階での動作確認
+- 問題発生時の迅速な対応
+- ロールバック手順の確認
 
-#### テスト項目
-- [ ] WordPressサイトの表示確認
-- [ ] 管理画面へのログイン確認
-- [ ] 新規投稿の作成確認
-- [ ] コメント機能の確認
-- [ ] 画像アップロードの確認
+### 3. 監視とアラート
+- デプロイメント後の監視
+- パフォーマンスの確認
+- エラーアラートの設定
+- セキュリティイベントの監視
 
-### 2. デプロイメント中の監視
+### 4. ドキュメント管理
+- 変更履歴の記録
+- 設定変更の記録
+- トラブルシューティングの記録
+- ベストプラクティスの共有
 
-#### 監視項目
-- **ワークフロー実行**: GitHub Actionsの実行状況
-- **リソース状態**: EC2/RDSの起動/停止状況
-- **ネットワーク**: 接続状況とレスポンス時間
-- **ログ**: エラーログと警告メッセージ
-
-#### 対応手順
-1. **正常時**: 完了通知の確認
-2. **警告時**: ログの詳細確認
-3. **エラー時**: 即座のロールバック検討
-
-### 3. デプロイメント後の確認
-
-#### 確認項目
-- [ ] 本番環境の正常動作確認
-- [ ] パフォーマンスの確認
-- [ ] セキュリティログの確認
-- [ ] バックアップの確認
-- [ ] 検証環境のクリーンアップ確認
-
-#### ドキュメント更新
-- [ ] 変更内容の記録
-- [ ] 設定変更の記録
-- [ ] 問題と対処法の記録
-- [ ] 次回の改善点の記録
-
-### 4. 定期メンテナンス
-
-#### 週次メンテナンス
-- [ ] ログの確認と分析
-- [ ] パフォーマンスの確認
-- [ ] セキュリティの確認
-- [ ] バックアップの確認
-
-#### 月次メンテナンス
-- [ ] 認証情報の更新
-- [ ] セキュリティパッチの適用
-- [ ] パフォーマンスの最適化
-- [ ] コストの見直し
-
-#### 四半期メンテナンス
-- [ ] アーキテクチャの見直し
-- [ ] セキュリティ監査の実施
-- [ ] ドキュメントの更新
-- [ ] ベストプラクティスの更新
+### 5. セキュリティ強化
+- 定期的なセキュリティ更新
+- 脆弱性スキャンの実施
+- アクセス制御の強化
+- 監査ログの確認
 
 ---
 
-## まとめ
+## 定期メンテナンス
 
-この自動デプロイメントシステムにより、安全で効率的なWordPress環境の運用が可能になります。GitHub Actionsを活用することで、手動作業を最小限に抑え、人的ミスを削減できます。
+### 毎週の確認
+- [ ] ログファイルの確認
+- [ ] バックアップの確認
+- [ ] 設定ファイルの更新確認
+- [ ] セキュリティ設定の確認
 
-### 重要なポイント
-1. **安全性**: 検証環境でのテストと承認フロー
-2. **効率性**: 自動化による作業時間の短縮
-3. **可視性**: 詳細なログと監視機能
-4. **保守性**: 標準化されたワークフロー
+### 毎月の確認
+- [ ] スナップショットの整理
+- [ ] セキュリティ設定の確認
+- [ ] パフォーマンスの確認
+- [ ] コストの確認
 
-### 今後の改善
-1. **監視強化**: より詳細な監視機能の追加
-2. **自動化拡張**: より多くの作業の自動化
-3. **セキュリティ強化**: より厳格なセキュリティ設定
-4. **パフォーマンス最適化**: 実行時間の短縮
+### 四半期の確認
+- [ ] システム全体の見直し
+- [ ] セキュリティ監査
+- [ ] ドキュメントの更新
+- [ ] ベストプラクティスの見直し
 
-このシステムを活用して、安全で効率的なWordPress環境の運用を実現してください。 
+---
+
+## 注意事項
+
+1. **必ず検証環境でテストしてから本番環境に反映**
+2. **デプロイメント前のバックアップ確認**
+3. **緊急時以外は営業時間内に実行**
+4. **すべての操作のログ記録**
+5. **セキュリティを最優先に考慮**
+6. **定期的なセキュリティ監査の実施**
+7. **パスワードの定期変更の実施**
+8. **アクセス制御の強化**
+
+---
+
+*この手順書は随時更新されます。最新版を確認してから作業を開始してください。* 

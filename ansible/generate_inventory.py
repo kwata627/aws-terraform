@@ -159,6 +159,19 @@ def generate_inventory(terraform_output: Dict[str, Any]) -> Dict[str, Any]:
     else:
         logger.info("NATインスタンスは設定されていません")
     
+    # RDSエンドポイントの設定
+    if 'rds_endpoint' in terraform_output:
+        rds_endpoint = terraform_output['rds_endpoint']['value']
+        if rds_endpoint:
+            # WordPressグループの全ホストにRDSエンドポイントを設定
+            for host in inventory['all']['children']['wordpress']['hosts']:
+                inventory['all']['children']['wordpress']['hosts'][host]['rds_endpoint'] = rds_endpoint
+            logger.info(f"RDSエンドポイントを設定: {rds_endpoint}")
+        else:
+            logger.warning("RDSエンドポイントが空です")
+    else:
+        logger.warning("RDSエンドポイントの情報が見つかりません")
+    
     # 環境変数による追加設定
     if os.getenv('ANSIBLE_EXTRA_VARS'):
         try:

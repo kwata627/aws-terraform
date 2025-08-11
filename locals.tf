@@ -13,7 +13,6 @@ locals {
       Project     = var.project
       Environment = var.environment
       ManagedBy   = "terraform"
-      CreatedAt   = timestamp()
       Version     = "2.0.0"
     },
     var.tags
@@ -207,7 +206,7 @@ locals {
     ignore_public_acls = true
     restrict_public_buckets = true
     object_ownership = "BucketOwnerEnforced"
-    bucket_acl = "private"
+    bucket_acl = null
     enable_lifecycle_management = true
     enable_access_logging = false
     enable_inventory = false

@@ -170,11 +170,29 @@ resource "aws_route53_zone" "main" {
 }
 
 # -----------------------------------------------------------------------------
-# Domain Registration (Optional)
+# Domain Registration Check and Registration
 # -----------------------------------------------------------------------------
 
+# ドメイン登録状況の確認と登録処理
+data "external" "domain_check" {
+  program = ["bash", "${path.module}/scripts/check_and_register_domain.sh", "-d", var.domain_name, "-f", "${path.root}/terraform.tfvars"]
+  
+  # スクリプトが失敗した場合の処理
+  query = {
+    domain_name = var.domain_name
+  }
+}
+
+locals {
+  # スクリプトの結果を解析
+  domain_check_result = data.external.domain_check.result
+  should_register_domain = try(local.domain_check_result.register_domain, "false") == "true"
+  domain_unavailable = try(local.domain_check_result.domain_unavailable, "false") == "true"
+}
+
+# ドメイン登録リソース（条件付き）
 resource "aws_route53domains_registered_domain" "main" {
-  count = var.register_domain ? 1 : 0
+  count = local.should_register_domain ? 1 : 0
 
   provider = aws.us_east_1
 
@@ -222,8 +240,16 @@ resource "aws_route53domains_registered_domain" "main" {
     zip_code          = var.registrant_info.zip_code
   }
 
+  # プライバシー保護設定
+  admin_privacy      = true
+  registrant_privacy = true
+  tech_privacy       = true
+
   # 自動更新を有効化
   auto_renew = true
+
+  # 転送ロックを有効化
+  transfer_lock = true
 
   tags = merge(
     local.common_tags,
@@ -231,6 +257,11 @@ resource "aws_route53domains_registered_domain" "main" {
       Name = "${var.project}-registered-domain"
     }
   )
+
+  # ライフサイクル設定
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # -----------------------------------------------------------------------------
@@ -275,11 +306,13 @@ resource "aws_route53_record" "wordpress" {
 
 # CloudFront用CNAMEレコード
 resource "aws_route53_record" "cloudfront" {
+  count = var.cloudfront_domain_name != "" ? 1 : 0
+  
   zone_id = aws_route53_zone.main.zone_id
   name    = "static.${local.normalized_domain_name}"
   type    = "CNAME"
   ttl     = "300"
-  records = var.cloudfront_domain_name != "" ? [var.cloudfront_domain_name] : []
+  records = [var.cloudfront_domain_name]
 
   # Route53レコードではタグは使用できないため削除
 }

@@ -112,9 +112,10 @@ variable "db_password" {
 variable "snapshot_date" {
   description = "スナップショット識別子用の日付 (例: 20240727)"
   type        = string
+  default     = ""
   validation {
-    condition     = can(regex("^[0-9]{8}$", var.snapshot_date))
-    error_message = "スナップショット日付は8桁の数字である必要があります（例: 20240727）。"
+    condition     = var.snapshot_date == "" || can(regex("^[0-9]{8}$", var.snapshot_date))
+    error_message = "スナップショット日付は空または8桁の数字である必要があります（例: 20240727）。"
   }
 }
 

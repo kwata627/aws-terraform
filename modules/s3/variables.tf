@@ -141,11 +141,11 @@ variable "object_ownership" {
 variable "bucket_acl" {
   description = "バケットACL"
   type        = string
-  default     = "private"
+  default     = null
   
   validation {
-    condition     = contains(["private", "public-read", "public-read-write", "authenticated-read"], var.bucket_acl)
-    error_message = "バケットACLは private, public-read, public-read-write, authenticated-read のいずれかである必要があります。"
+    condition     = var.bucket_acl == null || contains(["private", "public-read", "public-read-write", "authenticated-read"], var.bucket_acl)
+    error_message = "バケットACLは null または private, public-read, public-read-write, authenticated-read のいずれかである必要があります。"
   }
 }
 

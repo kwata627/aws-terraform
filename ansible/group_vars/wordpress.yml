@@ -4,9 +4,9 @@ wordpress_domain: "{{ ansible_default_ipv4.address }}"
 
 # データベース設定
 wordpress_db_host: "{{ rds_endpoint | default('localhost') }}"
-wordpress_db_name: "{{ wordpress_db_name | default('wordpress') }}"
-wordpress_db_user: "{{ wordpress_db_user | default('wordpress') }}"
-wordpress_db_password: "{{ db_password | default('password') }}"
+wordpress_db_name: wordpress
+wordpress_db_user: admin
+wordpress_db_password: breadhouse
 wordpress_db_charset: utf8mb4
 
 # Apache設定

@@ -14,7 +14,7 @@ define( 'DB_USER', '{{ wordpress_db_user | default('wordpress') }}' );
 define( 'DB_PASSWORD', '{{ wordpress_db_password | default('password') }}' );
 
 /** MySQLのホスト名 */
-define( 'DB_HOST', '{{ wordpress_db_host | default('localhost') }}' );
+define( 'DB_HOST', '{{ rds_endpoint | default(wordpress_db_host) | default('localhost') }}' );
 
 /** データベースのテーブルを作成する際のデータベース文字セット */
 define( 'DB_CHARSET', '{{ wordpress_db_charset | default('utf8') }}' );

@@ -1,0 +1,94 @@
+---
+# WordPress デバッグ設定プレイブック
+- name: Enable WordPress Debug Mode
+  hosts: wordpress
+  become: yes
+  vars:
+    wordpress_debug: true
+    wordpress_debug_log: true
+    wordpress_debug_display: false
+    php_display_errors: On
+    php_log_errors: On
+  
+  roles:
+    - apache
+  
+  tasks:
+    - name: Backup current wp-config.php
+      copy:
+        src: /var/www/html/wp-config.php
+        dest: /var/www/html/wp-config.php.backup
+        remote_src: yes
+        backup: yes
+      become: yes
+
+    - name: Update wp-config.php with debug settings
+      template:
+        src: ../roles/wordpress/templates/wp-config.php.j2
+        dest: /var/www/html/wp-config.php
+        owner: apache
+        group: apache
+        mode: '0644'
+      become: yes
+      vars:
+        wordpress_debug: true
+        wordpress_debug_log: true
+        wordpress_debug_display: false
+
+    - name: Update PHP configuration for debugging
+      template:
+        src: ../roles/php/templates/php.ini.j2
+        dest: /etc/php.ini
+        mode: '0644'
+      become: yes
+      vars:
+        php_display_errors: On
+        php_log_errors: On
+      notify: restart apache
+
+    - name: Create debug log directory
+      file:
+        path: /var/www/html/wp-content
+        state: directory
+        mode: '0755'
+        owner: apache
+        group: apache
+      become: yes
+
+    - name: Create debug.log file
+      file:
+        path: /var/www/html/wp-content/debug.log
+        state: touch
+        mode: '0664'
+        owner: apache
+        group: apache
+      become: yes
+
+    - name: Set debug.log permissions
+      file:
+        path: /var/www/html/wp-content/debug.log
+        mode: '0664'
+        owner: apache
+        group: apache
+      become: yes
+
+    - name: Restart Apache to apply changes
+      service:
+        name: httpd
+        state: restarted
+      become: yes
+
+    - name: Display debug information
+      debug:
+        msg: |
+          WordPress デバッグが有効になりました。
+          
+          確認すべきログファイル:
+          - WordPress デバッグログ: /var/www/html/wp-content/debug.log
+          - Apache エラーログ: /var/log/httpd/wordpress_error.log
+          - PHP エラーログ: /var/log/php_errors.log
+          
+          ログを確認するコマンド:
+          sudo tail -f /var/www/html/wp-content/debug.log
+          sudo tail -f /var/log/httpd/wordpress_error.log
+          sudo tail -f /var/log/php_errors.log

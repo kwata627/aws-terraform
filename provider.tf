@@ -43,7 +43,6 @@ provider "aws" {
         Project     = var.project
         Environment = var.environment
         ManagedBy   = "terraform"
-        CreatedAt   = timestamp()
         Version     = "2.0.0"
       },
       var.tags
@@ -72,7 +71,6 @@ provider "aws" {
         Project     = var.project
         Environment = var.environment
         ManagedBy   = "terraform"
-        CreatedAt   = timestamp()
         Version     = "2.0.0"
       },
       var.tags

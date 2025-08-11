@@ -194,10 +194,11 @@ variable "db_password" {
 variable "snapshot_date" {
   description = "スナップショット識別子用の日付 (例: 20250731)"
   type        = string
+  default     = ""
   
   validation {
-    condition     = can(regex("^[0-9]{8}$", var.snapshot_date))
-    error_message = "スナップショット日付は8桁の数字（YYYYMMDD）で指定してください。"
+    condition     = var.snapshot_date == "" || can(regex("^[0-9]{8}$", var.snapshot_date))
+    error_message = "スナップショット日付は空または8桁の数字（YYYYMMDD）で指定してください。"
   }
 }
 
@@ -231,9 +232,9 @@ variable "domain_name" {
 }
 
 variable "register_domain" {
-  description = "ドメイン登録を実行するかどうか"
+  description = "ドメイン登録を実行するかどうか（自動判定されるため、通常は変更不要）"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "registrant_info" {
@@ -267,7 +268,7 @@ variable "registrant_info" {
     condition = alltrue([
       length(var.registrant_info.first_name) > 0,
       length(var.registrant_info.last_name) > 0,
-      length(var.registrant_info.organization_name) > 0,
+      length(var.registrant_info.organization_name) >= 0,
       can(regex("^[^@]+@[^@]+\\.[^@]+$", var.registrant_info.email)),
       length(var.registrant_info.phone_number) > 0,
       length(var.registrant_info.address_line_1) > 0,
