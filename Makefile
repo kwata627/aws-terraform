@@ -21,6 +21,7 @@ help:
 	@echo "  make wordpress-setup  - WordPress環境構築"
 	@echo "  make ssl-setup        - SSL設定"
 	@echo "  make test-environment - 環境テスト"
+	@echo "  make generate-password - セキュアパスワード生成"
 	@echo "  make full-setup       - 完全セットアップ（推奨）"
 	@echo "  make clean         - 一時ファイル削除"
 	@echo "  make status        - 現在の状態確認"

@@ -31,7 +31,7 @@
 
 - name: Display MariaDB client version
   debug:
-    msg: "MariaDB client version: {{ mariadb_version.stdout if mariadb_version.rc == 0 else 'Not installed' }}"
+    msg: "MariaDB client version: {{ mariadb_version.stdout if mariadb_version is success and mariadb_version.stdout is defined else 'Not installed' }}"
 
 - name: Install PyMySQL for Python 3
   pip:

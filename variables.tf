@@ -106,6 +106,17 @@ variable "az1" {
   }
 }
 
+variable "enable_ssl_setup" {
+  description = "SSL設定の自動実行を有効にするかどうか"
+  type        = bool
+  default     = false
+  
+  validation {
+    condition     = contains([true, false], var.enable_ssl_setup)
+    error_message = "enable_ssl_setupは true または false である必要があります。"
+  }
+}
+
 # -----------------------------------------------------------------------------
 # EC2 Configuration
 # -----------------------------------------------------------------------------

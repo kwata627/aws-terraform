@@ -24,7 +24,7 @@ data "external" "domain_analysis" {
 # ローカル変数でドメイン分析結果を解析
 locals {
   domain_analysis = data.external.domain_analysis.result
-  should_use_existing_zone = false  # 強制再作成のため、既存ホストゾーンを使用しない
+  should_use_existing_zone = try(local.domain_analysis.should_use_existing, "false") == "true"
   should_register_domain = try(local.domain_analysis.should_register_domain, "false") == "true"
   domain_exists_in_route53 = try(local.domain_analysis.domain_exists_in_route53, "false") == "true"
   domain_exists_in_dns = try(local.domain_analysis.domain_exists_in_dns, "false") == "true"

@@ -82,10 +82,29 @@ define( 'FORCE_SSL_LOGIN', true );
 /**
  * WordPress URL設定
  */
-{% if wordpress_domain is defined %}
+{% if wordpress_domain is defined and wordpress_domain | length > 0 %}
+{% if wordpress_force_ssl | default(false) %}
 define( 'WP_HOME', 'https://{{ wordpress_domain }}' );
 define( 'WP_SITEURL', 'https://{{ wordpress_domain }}' );
+{% else %}
+define( 'WP_HOME', 'http://{{ wordpress_domain }}' );
+define( 'WP_SITEURL', 'http://{{ wordpress_domain }}' );
 {% endif %}
+{% elif ansible_public_ipv4 is defined and ansible_public_ipv4 | length > 0 %}
+define( 'WP_HOME', 'http://{{ ansible_public_ipv4 }}' );
+define( 'WP_SITEURL', 'http://{{ ansible_public_ipv4 }}' );
+{% elif ansible_default_ipv4 is defined %}
+define( 'WP_HOME', 'http://{{ ansible_default_ipv4.address }}' );
+define( 'WP_SITEURL', 'http://{{ ansible_default_ipv4.address }}' );
+{% else %}
+define( 'WP_HOME', 'http://localhost' );
+define( 'WP_SITEURL', 'http://localhost' );
+{% endif %}
+
+/**
+ * 言語設定
+ */
+define( 'WPLANG', '{{ wordpress_locale | default('ja') }}' );
 
 /* 追加設定値は「さくらのマニュアル」をご利用ください。 */
 

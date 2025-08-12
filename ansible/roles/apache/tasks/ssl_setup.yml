@@ -12,67 +12,73 @@
     - /etc/ssl/certs
     - /etc/ssl/private
 
-- name: Get ACM certificate from AWS
-  aws_acm_certificate:
-    domain_name: "{{ wordpress_domain }}"
-    subject_alternative_names:
-      - "{{ wordpress_domain }}"
-      - "*.{{ wordpress_domain }}"
-    validation_method: dns
-    region: us-east-1
-  register: acm_cert
-  delegate_to: localhost
-  when: wordpress_domain is defined
+# Terraformで既にACM証明書を作成しているため、一時的に無効化
+# - name: Get ACM certificate from AWS
+#   aws_acm_certificate:
+#     domain_name: "{{ wordpress_domain }}"
+#     subject_alternative_names:
+#       - "{{ wordpress_domain }}"
+#       - "*.{{ wordpress_domain }}"
+#     validation_method: dns
+#     region: us-east-1
+#   register: acm_cert
+#   delegate_to: localhost
+#   when: wordpress_domain is defined
 
-- name: Download certificate files
-  aws_acm_certificate:
-    certificate_arn: "{{ acm_cert.certificate_arn }}"
-    region: us-east-1
-  register: cert_data
-  delegate_to: localhost
-  when: acm_cert is defined
+# - name: Download certificate files
+#   aws_acm_certificate:
+#     certificate_arn: "{{ acm_cert.certificate_arn }}"
+#     region: us-east-1
+#   register: cert_data
+#   delegate_to: localhost
+#   when: acm_cert is defined
 
-- name: Save certificate to file
-  copy:
-    content: "{{ cert_data.certificate }}"
-    dest: /etc/ssl/certs/wordpress.crt
-    mode: '0644'
-    owner: root
-    group: root
-  when: cert_data is defined
+# - name: Save certificate to file
+#   copy:
+#     content: "{{ cert_data.certificate }}"
+#     dest: /etc/ssl/certs/wordpress.crt
+#     mode: '0644'
+#     owner: root
+#     group: root
+#   when: cert_data is defined
 
-- name: Save private key to file
-  copy:
-    content: "{{ cert_data.private_key }}"
-    dest: /etc/ssl/private/wordpress.key
-    mode: '0600'
-    owner: root
-    group: root
-  when: cert_data is defined
+# - name: Save private key to file
+#   copy:
+#     content: "{{ cert_data.private_key }}"
+#     dest: /etc/ssl/private/wordpress.key
+#     mode: '0600'
+#     owner: root
+#     group: root
+#   when: cert_data is defined
 
-- name: Save certificate chain to file
-  copy:
-    content: "{{ cert_data.certificate_chain }}"
-    dest: /etc/ssl/certs/wordpress-chain.crt
-    mode: '0644'
-    owner: root
-    group: root
-  when: cert_data is defined and cert_data.certificate_chain is defined
+# - name: Save certificate chain to file
+#   copy:
+#     content: "{{ cert_data.certificate_chain }}"
+#     dest: /etc/ssl/certs/wordpress-chain.crt
+#     mode: '0644'
+#     owner: root
+#     group: root
+#   when: cert_data is defined and cert_data.certificate_chain is defined
 
 - name: Enable SSL module
-  apache2_module:
-    name: ssl
-    state: present
+  command: "{{ item }}"
+  loop:
+    - "yum install -y mod_ssl"
+    - "systemctl enable httpd"
+    - "systemctl start httpd"
+  changed_when: false
   notify: restart apache
 
 - name: Enable rewrite module
-  apache2_module:
-    name: rewrite
-    state: present
+  command: "{{ item }}"
+  loop:
+    - "echo 'LoadModule rewrite_module modules/mod_rewrite.so' >> /etc/httpd/conf/httpd.conf"
+  changed_when: false
   notify: restart apache
 
 - name: Enable headers module
-  apache2_module:
-    name: headers
-    state: present
+  command: "{{ item }}"
+  loop:
+    - "echo 'LoadModule headers_module modules/mod_headers.so' >> /etc/httpd/conf/httpd.conf"
+  changed_when: false
   notify: restart apache

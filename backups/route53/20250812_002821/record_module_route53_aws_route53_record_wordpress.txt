@@ -1,0 +1,15 @@
+# module.route53.aws_route53_record.wordpress:
+resource "aws_route53_record" "wordpress" {
+    fqdn                             = "shamolife.com"
+    health_check_id                  = [90mnull[0m[0m
+    id                               = "Z0031614DJ701EV9ZQ26_shamolife.com_A"
+    multivalue_answer_routing_policy = false
+    name                             = "shamolife.com"
+    records                          = [
+        "52.199.217.151",
+    ]
+    set_identifier                   = [90mnull[0m[0m
+    ttl                              = 300
+    type                             = "A"
+    zone_id                          = "Z0031614DJ701EV9ZQ26"
+}

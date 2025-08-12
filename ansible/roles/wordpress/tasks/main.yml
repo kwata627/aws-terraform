@@ -9,11 +9,12 @@
     group: apache
   become: yes
 
-- name: Download WordPress
+- name: Download Japanese WordPress
   get_url:
-    url: https://wordpress.org/latest.tar.gz
+    url: https://ja.wordpress.org/latest-ja.tar.gz
     dest: /tmp/wordpress.tar.gz
     mode: '0644'
+    timeout: 300
   become: yes
 
 - name: Extract WordPress
@@ -41,18 +42,7 @@
     recurse: yes
   become: yes
 
-- name: Create wp-config.php from sample
-  copy:
-    src: /var/www/html/wp-config-sample.php
-    dest: /var/www/html/wp-config.php
-    remote_src: yes
-    owner: apache
-    group: apache
-    mode: '0644'
-  become: yes
-  when: wordpress_config_auto | default(false)
-
-- name: Configure wp-config.php
+- name: Configure wp-config.php from template
   template:
     src: wp-config.php.j2
     dest: /var/www/html/wp-config.php
@@ -60,7 +50,7 @@
     group: apache
     mode: '0644'
   become: yes
-  when: wordpress_config_auto | default(false)
+  notify: restart apache
 
 - name: Clean up temporary files
   file:
@@ -72,4 +62,30 @@
   file:
     path: /tmp/wordpress
     state: absent
+  become: yes
+
+- name: Set WordPress language to Japanese
+  lineinfile:
+    path: /var/www/html/wp-config.php
+    regexp: "define\\( 'WPLANG', '.*' \\);"
+    line: "define( 'WPLANG', '{{ wordpress_locale | default('ja') }}' );"
+    state: present
+  become: yes
+  notify: restart apache
+
+- name: Create wp-content/languages directory
+  file:
+    path: /var/www/html/wp-content/languages
+    state: directory
+    mode: '0755'
+    owner: apache
+    group: apache
+  become: yes
+
+- name: Set correct permissions for languages directory
+  file:
+    path: /var/www/html/wp-content/languages
+    owner: apache
+    group: apache
+    recurse: yes
   become: yes 

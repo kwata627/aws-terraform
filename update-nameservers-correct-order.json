@@ -1,0 +1,26 @@
+{
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "shamolife.com.",
+        "Type": "NS",
+        "TTL": 172800,
+        "ResourceRecords": [
+          {
+            "Value": "ns-1529.awsdns-63.org."
+          },
+          {
+            "Value": "ns-1593.awsdns-07.co.uk."
+          },
+          {
+            "Value": "ns-612.awsdns-12.net."
+          },
+          {
+            "Value": "ns-7.awsdns-00.com."
+          }
+        ]
+      }
+    }
+  ]
+}

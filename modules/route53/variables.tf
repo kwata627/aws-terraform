@@ -55,8 +55,35 @@ variable "cloudfront_domain_name" {
   }
 }
 
+
+
 variable "register_domain" {
   description = "ドメイン登録を実行するかどうか（自動判定されるため、通常は変更不要）"
+  type        = bool
+  default     = false
+}
+
+# ドメイン分析結果
+variable "should_use_existing_zone" {
+  description = "既存のRoute53ホストゾーンを使用するかどうか"
+  type        = bool
+  default     = false
+}
+
+variable "domain_exists_in_route53" {
+  description = "Route53にホストゾーンが存在するかどうか"
+  type        = bool
+  default     = false
+}
+
+variable "domain_exists_in_dns" {
+  description = "DNSにネームサーバーが存在するかどうか"
+  type        = bool
+  default     = false
+}
+
+variable "domain_registered" {
+  description = "ドメインが登録済みかどうか"
   type        = bool
   default     = false
 }

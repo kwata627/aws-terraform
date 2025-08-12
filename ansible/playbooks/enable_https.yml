@@ -1,0 +1,223 @@
+---
+# HTTPS設定有効化プレイブック
+- name: Enable HTTPS for WordPress
+  hosts: wordpress
+  become: yes
+  vars:
+    wordpress_force_ssl: true
+    wordpress_ssl_admin: true
+  
+  tasks:
+    - name: Update WordPress SSL settings
+      template:
+        src: ../roles/wordpress/templates/wp-config.php.j2
+        dest: /var/www/html/wp-config.php
+        owner: apache
+        group: apache
+        mode: '0644'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HTTPS redirect in Apache
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^    # RewriteEngine On'
+        replace: '    RewriteEngine On'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HTTPS redirect rules
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^    # RewriteCond %{HTTPS} off'
+        replace: '    RewriteCond %{HTTPS} off'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HTTPS redirect rule
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^    # RewriteRule \^\(\.\*\)\$ https://%{HTTP_HOST}%{REQUEST_URI} \[L,R=301\]'
+        replace: '    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HSTS header
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^        # Header always set Strict-Transport-Security'
+        replace: '        Header always set Strict-Transport-Security'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HTTPS VirtualHost
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^# <VirtualHost \*:443>'
+        replace: '<VirtualHost *:443>'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HTTPS VirtualHost closing
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^# </VirtualHost>'
+        replace: '</VirtualHost>'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable SSL Engine
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     SSLEngine on'
+        replace: '    SSLEngine on'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable SSL Certificate File
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     SSLCertificateFile /etc/ssl/certs/wordpress.crt'
+        replace: '    SSLCertificateFile /etc/ssl/certs/wordpress.crt'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable SSL Certificate Key File
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     SSLCertificateKeyFile /etc/ssl/private/wordpress.key'
+        replace: '    SSLCertificateKeyFile /etc/ssl/private/wordpress.key'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable SSL Certificate Chain File
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     SSLCertificateChainFile /etc/ssl/certs/wordpress-chain.crt'
+        replace: '    SSLCertificateChainFile /etc/ssl/certs/wordpress-chain.crt'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable SSL Protocol
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     SSLProtocol all -SSLv2 -SSLv3 -TLSv1 -TLSv1.1'
+        replace: '    SSLProtocol all -SSLv2 -SSLv3 -TLSv1 -TLSv1.1'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable SSL Cipher Suite
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     SSLCipherSuite ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384'
+        replace: '    SSLCipherSuite ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable SSL Honor Cipher Order
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     SSLHonorCipherOrder on'
+        replace: '    SSLHonorCipherOrder on'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable SSL Compression off
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     SSLCompression off'
+        replace: '    SSLCompression off'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable SSL Session Tickets off
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     SSLSessionTickets off'
+        replace: '    SSLSessionTickets off'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HSTS in HTTPS VirtualHost
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     Header always set Strict-Transport-Security'
+        replace: '    Header always set Strict-Transport-Security'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HTTPS Directory settings
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     <Directory /var/www/html>'
+        replace: '    <Directory /var/www/html>'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HTTPS Directory closing
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     </Directory>'
+        replace: '    </Directory>'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HTTPS security headers
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     # セキュリティヘッダー'
+        replace: '    # セキュリティヘッダー'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HTTPS headers module
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     <IfModule mod_headers.c>'
+        replace: '    <IfModule mod_headers.c>'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HTTPS headers closing
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     </IfModule>'
+        replace: '    </IfModule>'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HTTPS log settings
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     # ログ設定'
+        replace: '    # ログ設定'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HTTPS error log
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     ErrorLog logs/wordpress_ssl_error.log'
+        replace: '    ErrorLog logs/wordpress_ssl_error.log'
+      become: yes
+      notify: restart apache
+    
+    - name: Enable HTTPS access log
+      replace:
+        path: /etc/httpd/conf.d/wordpress.conf
+        regexp: '^#     CustomLog logs/wordpress_ssl_access.log combined'
+        replace: '    CustomLog logs/wordpress_ssl_access.log combined'
+      become: yes
+      notify: restart apache
+    
+    - name: Test HTTPS connection
+      uri:
+        url: "https://{{ ansible_default_ipv4.address | default(wordpress_domain) }}"
+        method: GET
+        validate_certs: no
+      register: https_test
+      ignore_errors: yes
+    
+    - name: Display HTTPS test result
+      debug:
+        msg: "HTTPS connection test: {{ https_test.status if https_test is defined else 'Not tested' }}"

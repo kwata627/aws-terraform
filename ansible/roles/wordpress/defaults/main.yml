@@ -2,6 +2,8 @@
 # WordPressロールのデフォルト変数
 wordpress_version: latest
 wordpress_document_root: /var/www/html
+wordpress_locale: ja
+wordpress_language: ja
 
 # データベース設定
 wordpress_db_name: wordpress
@@ -35,4 +37,8 @@ wordpress_disallow_file_edit: true
 wordpress_disallow_file_mods: true
 
 # 自動設定
-wordpress_config_auto: false 
+wordpress_config_auto: false
+
+# SSL設定
+wordpress_force_ssl: false
+wordpress_ssl_admin: false 

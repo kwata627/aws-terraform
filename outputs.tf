@@ -7,6 +7,22 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
+# Domain Analysis Outputs
+# -----------------------------------------------------------------------------
+
+output "domain_analysis" {
+  description = "ドメイン分析結果"
+  value = {
+    domain_name = local.domain_config.domain_name
+    should_use_existing_zone = local.should_use_existing_zone
+    should_register_domain = local.should_register_domain
+    domain_exists_in_route53 = local.domain_exists_in_route53
+    domain_exists_in_dns = local.domain_exists_in_dns
+    domain_registered = local.domain_registered
+  }
+}
+
+# -----------------------------------------------------------------------------
 # SSH Key Auto-Setup Resource
 # -----------------------------------------------------------------------------
 
@@ -164,6 +180,8 @@ resource "null_resource" "wordpress_setup" {
 # -----------------------------------------------------------------------------
 
 resource "null_resource" "ssl_setup" {
+  count = var.enable_ssl_setup ? 1 : 0
+  
   triggers = {
     domain_name = var.domain_name
     acm_certificate_arn = module.acm.certificate_arn
@@ -174,25 +192,33 @@ resource "null_resource" "ssl_setup" {
       # Ansibleディレクトリに移動
       cd ansible
       
-      # SSL証明書の設定
-      echo "SSL証明書の設定を開始中..."
-      if ansible-playbook -i inventory/hosts.yml playbooks/ssl_setup.yml; then
-        echo "✓ SSL証明書の設定が完了しました"
+      # ACM証明書の状態を確認
+      echo "ACM証明書の状態を確認中..."
+      CERT_STATUS=$(aws acm describe-certificate \
+        --certificate-arn "${module.acm.certificate_arn}" \
+        --region us-east-1 \
+        --query 'Certificate.Status' \
+        --output text 2>/dev/null || echo "UNKNOWN")
+      
+      echo "証明書の状態: $CERT_STATUS"
+      
+      # 証明書が発行済みの場合のみSSL設定を実行
+      if [ "$CERT_STATUS" = "ISSUED" ]; then
+        echo "SSL証明書の設定を開始中..."
+        if ansible-playbook -i inventory/hosts.yml playbooks/ssl_setup.yml; then
+          echo "✓ SSL証明書の設定が完了しました"
+        else
+          echo "✗ SSL証明書の設定に失敗しました"
+          exit 1
+        fi
       else
-        echo "✗ SSL証明書の設定に失敗しました"
-        exit 1
+        echo "証明書がまだ発行されていません。状態: $CERT_STATUS"
+        echo "証明書の発行を待機中..."
+        exit 0
       fi
       
       # 元のディレクトリに戻る
       cd ..
-      
-      # SSL設定の検証
-      echo "SSL設定を検証中..."
-      if ./scripts/validate-ssl-setup.sh; then
-        echo "✓ SSL設定の検証が完了しました"
-      else
-        echo "警告: SSL設定の検証に失敗しました"
-      fi
     EOT
   }
 
@@ -235,7 +261,7 @@ resource "null_resource" "environment_test" {
     EOT
   }
 
-  depends_on = [null_resource.ssl_setup]
+  depends_on = [null_resource.ssl_setup[0]]
 }
 
 # -----------------------------------------------------------------------------

@@ -13,6 +13,7 @@
 # - DNSクエリログ対応
 # - DNSSEC対応
 # - 詳細なタグ管理
+# - 既存ホストゾーンの強制再作成機能
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -36,6 +37,35 @@ terraform {
 data "aws_caller_identity" "current" {}
 
 data "aws_region" "current" {}
+
+# ホストゾーン選択スクリプトの実行
+data "external" "hosted_zone_selection" {
+  count = var.should_use_existing_zone && var.domain_exists_in_route53 ? 1 : 0
+  
+  program = ["bash", "${path.module}/scripts/select_hosted_zone.sh", "-d", var.domain_name, "-t"]
+  
+  query = {
+    DOMAIN_NAME = var.domain_name
+  }
+}
+
+# 既存のRoute53ホストゾーンを検索（選択されたホストゾーンIDを使用）
+data "aws_route53_zone" "existing" {
+  count = var.should_use_existing_zone && var.domain_exists_in_route53 && length(data.external.hosted_zone_selection) > 0 && try(data.external.hosted_zone_selection[0].result.selected_zone_id, null) != null ? 1 : 0
+  zone_id = try(data.external.hosted_zone_selection[0].result.selected_zone_id, null)
+}
+
+# ドメイン登録時のネームサーバー情報を取得
+data "external" "domain_nameservers" {
+  count = var.should_use_existing_zone && var.domain_exists_in_route53 && var.domain_registered ? 1 : 0
+  
+  program = ["bash", "${path.module}/scripts/get_domain_nameservers.sh", "-d", var.domain_name, "-t"]
+  
+  # 環境変数を設定
+  query = {
+    DOMAIN_NAME = var.domain_name
+  }
+}
 
 # -----------------------------------------------------------------------------
 # Local Values
@@ -64,6 +94,19 @@ locals {
     query_logging_role = "${var.project}-route53-query-logging-role"
     dnssec_ksk     = "${var.project}-dnssec-ksk"
   }
+  
+  # ホストゾーンの決定（既存または新規）
+  # 選択スクリプトの結果または既存のホストゾーンを使用、存在しない場合は新規作成
+  hosted_zone_id = try(data.external.hosted_zone_selection[0].result.selected_zone_id, try(data.aws_route53_zone.existing[0].zone_id, try(aws_route53_zone.main[0].zone_id, "Z04134961ZPYYOPGD0LQY")))
+  name_servers = try(data.aws_route53_zone.existing[0].name_servers, try(aws_route53_zone.main[0].name_servers, []))
+  
+  # 強制再作成フラグ（既存ホストゾーンが存在し、ネームサーバーが不一致の場合）
+  force_recreate_zone = var.should_use_existing_zone && var.domain_exists_in_route53 && var.domain_registered && length(data.external.domain_nameservers) > 0 && try(data.external.domain_nameservers[0].result.error, "") == "" && length(data.aws_route53_zone.existing) > 0 ? (
+    length(setintersection(
+      try(data.aws_route53_zone.existing[0].name_servers, []),
+      jsondecode(data.external.domain_nameservers[0].result.nameservers)
+    )) < 4
+  ) : false
 }
 
 # -----------------------------------------------------------------------------
@@ -150,8 +193,12 @@ resource "aws_iam_role_policy" "route53_query_logging" {
 # Route53 Hosted Zone
 # -----------------------------------------------------------------------------
 
+# 新しいホストゾーンの作成（既存ホストゾーンが存在しない場合、または強制再作成の場合）
 resource "aws_route53_zone" "main" {
+  count = (!var.should_use_existing_zone || !var.domain_exists_in_route53 || local.force_recreate_zone) && (length(data.external.hosted_zone_selection) == 0 || try(data.external.hosted_zone_selection[0].result.should_create_new, "false") == "true" || local.force_recreate_zone) ? 1 : 0
+  
   name = local.normalized_domain_name
+  comment = "Hosted zone for ${var.domain_name} managed by Terraform"
 
   # プライベートホストゾーン設定
   dynamic "vpc" {
@@ -167,6 +214,39 @@ resource "aws_route53_zone" "main" {
       Name = local.resource_names.hosted_zone
     }
   )
+  
+  # 強制再作成の場合のライフサイクル設定
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# 既存ホストゾーンの削除（強制再作成の場合）
+resource "null_resource" "delete_existing_hosted_zone" {
+  count = local.force_recreate_zone && length(data.aws_route53_zone.existing) > 0 ? 1 : 0
+  
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "既存ホストゾーンを削除中: ${data.aws_route53_zone.existing[0].zone_id}"
+      
+      # すべてのレコードを削除
+      aws route53 list-resource-record-sets --hosted-zone-id ${data.aws_route53_zone.existing[0].zone_id} --query 'ResourceRecordSets[?Type!=`NS` && Type!=`SOA`].{Name:Name,Type:Type,TTL:TTL,ResourceRecords:ResourceRecords}' --output json | \
+      jq -r '.[] | "aws route53 change-resource-record-sets --hosted-zone-id ${data.aws_route53_zone.existing[0].zone_id} --change-batch '\''{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":{\"Name\":\"'$Name'\",\"Type\":\"'$Type'\",\"TTL\":'$TTL',\"ResourceRecords\":'$ResourceRecords'}}]}'\''"' | \
+      while read cmd; do
+        if [ -n "$cmd" ]; then
+          echo "実行: $cmd"
+          eval "$cmd"
+        fi
+      done
+      
+      # ホストゾーンを削除
+      aws route53 delete-hosted-zone --id ${data.aws_route53_zone.existing[0].zone_id}
+      
+      echo "既存ホストゾーンの削除が完了しました"
+    EOT
+  }
+  
+  depends_on = [aws_route53_zone.main]
 }
 
 # -----------------------------------------------------------------------------
@@ -293,9 +373,30 @@ resource "aws_route53_health_check" "main" {
 # DNS Records
 # -----------------------------------------------------------------------------
 
+# NSレコード（DelegationSetに基づく設定）
+resource "aws_route53_record" "nameservers" {
+  count = (var.should_use_existing_zone && var.domain_exists_in_route53 && var.domain_registered && length(data.external.domain_nameservers) > 0 && try(data.external.domain_nameservers[0].result.error, "") == "" && !local.force_recreate_zone) || length(aws_route53_zone.main) > 0 ? 1 : 0
+  
+  zone_id = local.hosted_zone_id
+  name    = local.normalized_domain_name
+  type    = "NS"
+  ttl     = "60"
+  
+  # 既存のNSレコードを上書きする
+  allow_overwrite = true
+  
+  # ネームサーバーの設定ロジック
+  # 1. 新規ホストゾーンの場合：DelegationSet（自動割り当てされたネームサーバー）を使用
+  # 2. 既存ホストゾーンで強制再作成の場合：新規ホストゾーンのネームサーバーを使用
+  # 3. 既存ホストゾーンで強制再作成でない場合：ホストゾーンのネームサーバーを使用（ドメイン登録時のネームサーバーと一致させる）
+  records = length(aws_route53_zone.main) > 0 ? aws_route53_zone.main[0].name_servers : (
+    local.force_recreate_zone ? [] : try(data.aws_route53_zone.existing[0].name_servers, [])
+  )
+}
+
 # WordPress用Aレコード
 resource "aws_route53_record" "wordpress" {
-  zone_id = aws_route53_zone.main.zone_id
+  zone_id = local.hosted_zone_id
   name    = local.normalized_domain_name
   type    = "A"
   ttl     = "300"
@@ -308,7 +409,7 @@ resource "aws_route53_record" "wordpress" {
 resource "aws_route53_record" "cloudfront" {
   count = var.cloudfront_domain_name != "" ? 1 : 0
   
-  zone_id = aws_route53_zone.main.zone_id
+  zone_id = local.hosted_zone_id
   name    = "static.${local.normalized_domain_name}"
   type    = "CNAME"
   ttl     = "300"
@@ -321,7 +422,7 @@ resource "aws_route53_record" "cloudfront" {
 resource "aws_route53_record" "additional" {
   for_each = { for idx, record in var.dns_records : idx => record }
 
-  zone_id = aws_route53_zone.main.zone_id
+  zone_id = local.hosted_zone_id
   name    = each.value.name
   type    = each.value.type
   ttl     = each.value.ttl
@@ -351,9 +452,9 @@ resource "aws_route53_record" "additional" {
 # -----------------------------------------------------------------------------
 
 resource "aws_route53_key_signing_key" "main" {
-  count = var.enable_dnssec ? 1 : 0
+  count = var.enable_dnssec && (!var.should_use_existing_zone || !var.domain_exists_in_route53 || local.force_recreate_zone) ? 1 : 0
 
-  hosted_zone_id             = aws_route53_zone.main.id
+  hosted_zone_id             = local.hosted_zone_id
   key_management_service_arn = "arn:aws:kms:us-east-1:${data.aws_caller_identity.current.account_id}:key/alias/aws/route53"
   name                       = "key-signing-key"
 
@@ -361,9 +462,9 @@ resource "aws_route53_key_signing_key" "main" {
 }
 
 resource "aws_route53_hosted_zone_dnssec" "main" {
-  count = var.enable_dnssec ? 1 : 0
+  count = var.enable_dnssec && (!var.should_use_existing_zone || !var.domain_exists_in_route53 || local.force_recreate_zone) ? 1 : 0
 
-  hosted_zone_id = aws_route53_zone.main.id
+  hosted_zone_id = local.hosted_zone_id
 }
 
 # -----------------------------------------------------------------------------
@@ -373,6 +474,9 @@ resource "aws_route53_hosted_zone_dnssec" "main" {
 resource "aws_route53_zone_association" "private" {
   for_each = var.is_private_zone ? { for vpc_id in var.private_zone_vpc_ids : vpc_id => vpc_id } : {}
 
-  zone_id = aws_route53_zone.main.zone_id
+  zone_id = local.hosted_zone_id
   vpc_id  = each.value
+  vpc_region = data.aws_region.current.name
+
+  # プライベートゾーン関連付けではタグは使用できないため削除
 }

@@ -1,0 +1,43 @@
+# module.route53.aws_route53_zone.main[0]:
+resource "aws_route53_zone" "main" {
+    arn                 = "arn:aws:route53:::hostedzone/Z0031614DJ701EV9ZQ26"
+    comment             = "Managed by Terraform"
+    delegation_set_id   = [90mnull[0m[0m
+    force_destroy       = false
+    id                  = "Z0031614DJ701EV9ZQ26"
+    name                = "shamolife.com"
+    name_servers        = [
+        "ns-1065.awsdns-05.org",
+        "ns-1573.awsdns-04.co.uk",
+        "ns-204.awsdns-25.com",
+        "ns-859.awsdns-43.net",
+    ]
+    primary_name_server = "ns-1065.awsdns-05.org"
+    tags                = {
+        "Backup"      = "enabled"
+        "CostCenter"  = "development"
+        "Environment" = "production"
+        "ManagedBy"   = "terraform"
+        "Module"      = "route53"
+        "Monitoring"  = "enabled"
+        "Name"        = "wp-shamo-hosted-zone"
+        "Owner"       = "watanabe"
+        "Project"     = "wp-shamo"
+        "Purpose"     = "wordpress-infrastructure"
+        "Version"     = "2.0.0"
+    }
+    tags_all            = {
+        "Backup"      = "enabled"
+        "CostCenter"  = "development"
+        "Environment" = "production"
+        "ManagedBy"   = "terraform"
+        "Module"      = "route53"
+        "Monitoring"  = "enabled"
+        "Name"        = "wp-shamo-hosted-zone"
+        "Owner"       = "watanabe"
+        "Project"     = "wp-shamo"
+        "Purpose"     = "wordpress-infrastructure"
+        "Version"     = "2.0.0"
+    }
+    zone_id             = "Z0031614DJ701EV9ZQ26"
+}

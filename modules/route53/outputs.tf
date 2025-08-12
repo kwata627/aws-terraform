@@ -7,23 +7,23 @@
 # -----------------------------------------------------------------------------
 
 output "zone_id" {
-  description = "作成したRoute53ホストゾーンのID"
-  value       = aws_route53_zone.main.zone_id
+  description = "Route53ホストゾーンのID（既存または新規）"
+  value       = try(data.external.hosted_zone_selection[0].result.selected_zone_id, try(data.aws_route53_zone.existing[0].zone_id, try(aws_route53_zone.main[0].zone_id, null)))
 }
 
 output "zone_name" {
   description = "Route53ホストゾーンの名前"
-  value       = aws_route53_zone.main.name
+  value       = local.normalized_domain_name
 }
 
 output "zone_arn" {
   description = "Route53ホストゾーンのARN"
-  value       = aws_route53_zone.main.arn
+  value       = var.should_use_existing_zone && var.domain_exists_in_route53 && length(data.aws_route53_zone.existing) > 0 ? data.aws_route53_zone.existing[0].arn : (length(aws_route53_zone.main) > 0 ? aws_route53_zone.main[0].arn : null)
 }
 
 output "name_servers" {
-  description = "Route53ホストゾーンのネームサーバー"
-  value       = aws_route53_zone.main.name_servers
+  description = "Route53ホストゾーンのネームサーバー（既存または新規）"
+  value       = length(local.name_servers) > 0 ? local.name_servers : null
 }
 
 output "zone_private" {
@@ -33,7 +33,7 @@ output "zone_private" {
 
 output "zone_name_servers_count" {
   description = "ネームサーバーの数"
-  value       = length(aws_route53_zone.main.name_servers)
+  value       = length(local.name_servers) > 0 ? length(local.name_servers) : 0
 }
 
 # -----------------------------------------------------------------------------
@@ -93,6 +93,8 @@ output "additional_records_created" {
   description = "作成された追加DNSレコードの数"
   value       = length(var.dns_records)
 }
+
+
 
 # -----------------------------------------------------------------------------
 # Health Check Outputs
@@ -198,7 +200,7 @@ output "module_summary" {
   description = "Route53モジュールの設定サマリー"
   value = {
     domain_name = var.domain_name
-    zone_id = aws_route53_zone.main.zone_id
+    zone_id = local.hosted_zone_id
     is_private = var.is_private_zone
     dnssec_enabled = var.enable_dnssec
     query_logging_enabled = var.enable_query_logging

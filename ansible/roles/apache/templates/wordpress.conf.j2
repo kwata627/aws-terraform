@@ -1,41 +1,12 @@
-# HTTP to HTTPS redirect
+# WordPress VirtualHost (HTTP only)
 <VirtualHost *:80>
-    ServerName {{ wordpress_domain | default('localhost') }}
-    
-    # HTTP to HTTPS redirect
-    RewriteEngine On
-    RewriteCond %{HTTPS} off
-    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-    
-    # セキュリティヘッダー
-    <IfModule mod_headers.c>
-        Header always set X-Content-Type-Options nosniff
-        Header always set X-Frame-Options DENY
-        Header always set X-XSS-Protection "1; mode=block"
-        Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-    </IfModule>
-</VirtualHost>
-
-# HTTPS VirtualHost
-<VirtualHost *:443>
-    ServerName {{ wordpress_domain | default('localhost') }}
+    ServerName {{ ansible_default_ipv4.address | default(wordpress_domain) | default('localhost') }}
     DocumentRoot /var/www/html
     
-    # SSL設定
-    SSLEngine on
-    SSLCertificateFile /etc/ssl/certs/wordpress.crt
-    SSLCertificateKeyFile /etc/ssl/private/wordpress.key
-    SSLCertificateChainFile /etc/ssl/certs/wordpress-chain.crt
-    
-    # SSL設定の強化
-    SSLProtocol all -SSLv2 -SSLv3 -TLSv1 -TLSv1.1
-    SSLCipherSuite ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384
-    SSLHonorCipherOrder on
-    SSLCompression off
-    SSLSessionTickets off
-    
-    # HSTS設定
-    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    # HTTP to HTTPS redirect (コメントアウト - 後で有効化)
+    # RewriteEngine On
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     
     <Directory /var/www/html>
         AllowOverride All
@@ -60,11 +31,64 @@
         Header always set X-Frame-Options DENY
         Header always set X-XSS-Protection "1; mode=block"
         Header always set Referrer-Policy "strict-origin-when-cross-origin"
-        Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https:; frame-src 'self'; object-src 'none';"
-        Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+        # HSTS設定 (コメントアウト - HTTPS有効化時に有効化)
+        # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     </IfModule>
     
     # ログ設定
-    ErrorLog logs/wordpress_ssl_error.log
-    CustomLog logs/wordpress_ssl_access.log combined
-</VirtualHost> 
+    ErrorLog logs/wordpress_error.log
+    CustomLog logs/wordpress_access.log combined
+</VirtualHost>
+
+# HTTPS VirtualHost (コメントアウト - ACM証明書検証完了後に有効化)
+# <VirtualHost *:443>
+#     ServerName {{ wordpress_domain | default('localhost') }}
+#     DocumentRoot /var/www/html
+#     
+#     # SSL設定
+#     SSLEngine on
+#     SSLCertificateFile /etc/ssl/certs/wordpress.crt
+#     SSLCertificateKeyFile /etc/ssl/private/wordpress.key
+#     SSLCertificateChainFile /etc/ssl/certs/wordpress-chain.crt
+#     
+#     # SSL設定の強化
+#     SSLProtocol all -SSLv2 -SSLv3 -TLSv1 -TLSv1.1
+#     SSLCipherSuite ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384
+#     SSLHonorCipherOrder on
+#     SSLCompression off
+#     SSLSessionTickets off
+#     
+#     # HSTS設定
+#     Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+#     
+#     <Directory /var/www/html>
+#         AllowOverride All
+#         Require all granted
+#         Options Indexes FollowSymLinks
+#         DirectoryIndex index.php index.html
+#         
+#         # WordPress用のリライトルール
+#         <IfModule mod_rewrite.c>
+#             RewriteEngine On
+#             RewriteBase /
+#             RewriteRule ^index\.php$ - [L]
+#             RewriteCond %{REQUEST_FILENAME} !-f
+#             RewriteCond %{REQUEST_FILENAME} !-d
+#             RewriteRule . /index.php [L]
+#         </IfModule>
+#     </Directory>
+#     
+#     # セキュリティヘッダー
+#     <IfModule mod_headers.c>
+#         Header always set X-Content-Type-Options nosniff
+#         Header always set X-Frame-Options DENY
+#         Header always set X-XSS-Protection "1; mode=block"
+#         Header always set Referrer-Policy "strict-origin-when-cross-origin"
+#         Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https:; frame-src 'self'; object-src 'none';"
+#         Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+#     </IfModule>
+#     
+#     # ログ設定
+#     ErrorLog logs/wordpress_ssl_error.log
+#     CustomLog logs/wordpress_ssl_access.log combined
+# </VirtualHost> 
