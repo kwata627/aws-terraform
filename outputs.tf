@@ -489,16 +489,25 @@ output "validation_rds_endpoint" {
 # CloudFront Information (When Enabled)
 # -----------------------------------------------------------------------------
 
-# CloudFront outputs are commented out since the module is disabled
-# output "cloudfront_distribution_id" {
-#   description = "CloudFrontディストリビューションのID"
-#   value       = try(module.cloudfront[0].distribution_id, null)
-# }
+output "cloudfront_distribution_id" {
+  description = "CloudFrontディストリビューションのID"
+  value       = try(module.cloudfront.distribution_id, null)
+}
 
-# output "cloudfront_domain_name" {
-#   description = "CloudFrontディストリビューションのドメイン名"
-#   value       = try(module.cloudfront[0].domain_name, null)
-# }
+output "cloudfront_domain_name" {
+  description = "CloudFrontディストリビューションのドメイン名"
+  value       = try(module.cloudfront.domain_name, null)
+}
+
+output "cloudfront_distribution_arn" {
+  description = "CloudFrontディストリビューションのARN"
+  value       = try(module.cloudfront.distribution_arn, null)
+}
+
+output "cloudfront_distribution_status" {
+  description = "CloudFrontディストリビューションのステータス"
+  value       = try(module.cloudfront.distribution_status, null)
+}
 
 # -----------------------------------------------------------------------------
 # Module Status Information
@@ -515,7 +524,7 @@ output "module_status" {
     rds_enabled = true
     s3_enabled = true
     acm_enabled = true
-    cloudfront_enabled = false  # 一時的に無効化
+    cloudfront_enabled = true
     route53_enabled = true
   }
 }

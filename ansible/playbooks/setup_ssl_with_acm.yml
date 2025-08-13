@@ -1,0 +1,132 @@
+---
+# SSL設定統合プレイブック（AWS認証 + ACM証明書）
+- name: Complete SSL Setup with ACM Certificate
+  hosts: wordpress
+  become: yes
+  vars:
+    aws_access_key_id: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+    aws_secret_access_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+    aws_default_region: "{{ lookup('env', 'AWS_DEFAULT_REGION') | default('ap-northeast-1') }}"
+    aws_region: "{{ lookup('env', 'AWS_REGION') | default('us-east-1') }}"
+    acm_certificate_arn: "{{ lookup('env', 'ACM_CERTIFICATE_ARN') | default('arn:aws:acm:us-east-1:827006371271:certificate/e7f1760d-fafe-43e4-b40d-e231b33c7ed3') }}"
+  
+  tasks:
+    - name: Check if AWS credentials are provided
+      fail:
+        msg: "AWS_ACCESS_KEY_ID environment variable is not set"
+      when: aws_access_key_id is not defined or aws_access_key_id == ""
+    
+    - name: Check if AWS secret key is provided
+      fail:
+        msg: "AWS_SECRET_ACCESS_KEY environment variable is not set"
+      when: aws_secret_access_key is not defined or aws_secret_access_key == ""
+    
+    - name: Create AWS credentials directory
+      file:
+        path: /home/ec2-user/.aws
+        state: directory
+        mode: '0700'
+        owner: ec2-user
+        group: ec2-user
+    
+    - name: Configure AWS credentials
+      template:
+        src: ../templates/aws_credentials.j2
+        dest: /home/ec2-user/.aws/credentials
+        mode: '0600'
+        owner: ec2-user
+        group: ec2-user
+    
+    - name: Configure AWS config
+      template:
+        src: ../templates/aws_config.j2
+        dest: /home/ec2-user/.aws/config
+        mode: '0600'
+        owner: ec2-user
+        group: ec2-user
+    
+    - name: Test AWS CLI authentication
+      shell: aws sts get-caller-identity
+      become_user: ec2-user
+      register: aws_test
+      ignore_errors: yes
+    
+    - name: Display AWS authentication result
+      debug:
+        msg: "AWS authentication: {{ 'SUCCESS' if aws_test.rc == 0 else 'FAILED' }}"
+    
+    - name: Download ACM certificate
+      shell: |
+        aws acm describe-certificate \
+          --certificate-arn "{{ acm_certificate_arn }}" \
+          --region {{ aws_region }} \
+          --query 'Certificate.Certificate' \
+          --output text > /tmp/wordpress.crt
+      become_user: ec2-user
+      ignore_errors: yes
+    
+    - name: Move certificate to SSL directory
+      copy:
+        src: /tmp/wordpress.crt
+        dest: /etc/ssl/certs/wordpress.crt
+        remote_src: yes
+        mode: '0644'
+        owner: root
+        group: root
+      when: acm_certificate_arn is defined
+    
+    - name: Download ACM private key
+      shell: |
+        aws acm describe-certificate \
+          --certificate-arn "{{ acm_certificate_arn }}" \
+          --region {{ aws_region }} \
+          --query 'Certificate.PrivateKey' \
+          --output text > /tmp/wordpress.key
+      become_user: ec2-user
+      ignore_errors: yes
+    
+    - name: Move private key to SSL directory
+      copy:
+        src: /tmp/wordpress.key
+        dest: /etc/ssl/private/wordpress.key
+        remote_src: yes
+        mode: '0600'
+        owner: root
+        group: root
+      when: acm_certificate_arn is defined
+    
+    - name: Set certificate permissions
+      file:
+        path: /etc/ssl/certs/wordpress.crt
+        mode: '0644'
+        owner: root
+        group: root
+    
+    - name: Set private key permissions
+      file:
+        path: /etc/ssl/private/wordpress.key
+        mode: '0600'
+        owner: root
+        group: root
+    
+    - name: Test Apache configuration
+      shell: apachectl -t
+      register: apache_test
+    
+    - name: Restart Apache if configuration is valid
+      service:
+        name: httpd
+        state: restarted
+      when: apache_test.rc == 0
+    
+    - name: Display completion message
+      debug:
+        msg: |
+          SSL設定が完了しました！
+          
+          アクセス情報:
+          - HTTPSサイト: https://54.250.141.52
+          - 管理画面: https://54.250.141.52/wp-admin
+          
+          注意: 自己署名証明書のため、ブラウザで警告が表示される場合があります。
+      when: apache_test.rc == 0

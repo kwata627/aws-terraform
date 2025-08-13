@@ -33,7 +33,7 @@ locals {
   # オリジン設定
   origin_config = {
     domain_name = var.origin_domain_name
-    origin_id   = "S3-${var.project}-static-files"
+    origin_id   = "EC2-${var.project}-wordpress"
     origin_path = var.origin_path
   }
   
@@ -41,7 +41,7 @@ locals {
   cache_behavior_config = {
     allowed_methods = var.allowed_methods
     cached_methods  = var.cached_methods
-    target_origin_id = "S3-${var.project}-static-files"
+    target_origin_id = "EC2-${var.project}-wordpress"
     viewer_protocol_policy = var.viewer_protocol_policy
     min_ttl = var.min_ttl
     default_ttl = var.default_ttl

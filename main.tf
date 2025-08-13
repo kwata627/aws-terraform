@@ -109,6 +109,9 @@ module "security" {
   # セキュリティルール設定
   security_rules = local.security_rules
   
+  # CloudFront設定
+  enable_cloudfront_access = true
+  
   # セキュリティ機能設定
   enable_security_audit = local.security_features.enable_security_audit
   enable_security_monitoring = local.security_features.enable_security_monitoring
@@ -132,6 +135,7 @@ module "ec2" {
   subnet_id         = module.network.public_subnet_ids[0]
   private_subnet_id = module.network.private_subnet_ids[0]
   security_group_id = local.enable_security ? module.security[0].ec2_public_sg_id : null
+  security_group_ids = local.enable_security ? module.security[0].cloudfront_access_sg_ids : []
   validation_security_group_id = local.enable_security ? module.security[0].ec2_private_sg_id : null
   key_name          = module.ssh.key_name
   ssh_public_key    = module.ssh.public_key_openssh
@@ -254,17 +258,20 @@ module "acm" {
 }
 
 # -----------------------------------------------------------------------------
-# CloudFront Module (Temporarily Disabled)
+# CloudFront Module
 # -----------------------------------------------------------------------------
 
-# module "cloudfront" {
-#   source                = "./modules/cloudfront"
-#   project               = var.project
-#   origin_domain_name    = module.s3.bucket_domain_name
-#   acm_certificate_arn   = module.acm.certificate_arn
-#   environment           = local.environment_config.name
-#   tags                  = local.common_tags
-# }
+module "cloudfront" {
+  source                = "./modules/cloudfront"
+  project               = var.project
+  origin_domain_name    = module.ec2.public_dns
+  acm_certificate_arn   = module.acm.certificate_arn
+  aliases               = ["cdn.${local.domain_config.domain_name}"]
+  environment           = local.environment_config.name
+  tags                  = local.common_tags
+  
+  depends_on = [module.acm, module.ec2]
+}
 
 # -----------------------------------------------------------------------------
 # Route53 Module
@@ -278,7 +285,7 @@ module "route53" {
   # ドメイン設定
   domain_name = local.domain_config.domain_name
   wordpress_ip = module.ec2.public_ip
-  # cloudfront_domain_name = module.cloudfront.domain_name # 一時的に無効化
+  cloudfront_domain_name = "d7kh2g6g16s8m.cloudfront.net"
   # certificate_validation_records = module.acm.validation_records # ACMモジュールで自動作成するため削除
   
   # ドメイン登録設定（分析結果に基づいて決定）

@@ -40,6 +40,16 @@ output "cache_sg_id" {
   value       = var.enable_cache_security_group ? aws_security_group.cache[0].id : null
 }
 
+output "cloudfront_access_sg_ids" {
+  description = "CloudFrontアクセス用セキュリティグループのIDリスト"
+  value       = var.enable_cloudfront_access ? [aws_security_group.cloudfront_access[0].id] : []
+}
+
+output "cloudfront_access_sg_id" {
+  description = "CloudFrontアクセス用セキュリティグループのID"
+  value       = var.enable_cloudfront_access ? aws_security_group.cloudfront_access[0].id : null
+}
+
 # -----------------------------------------------------------------------------
 # Security Group ARNs
 # -----------------------------------------------------------------------------

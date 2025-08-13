@@ -22,18 +22,12 @@ data "aws_region" "current" {
 # ACM Certificate Validation
 # -----------------------------------------------------------------------------
 
-data "aws_acm_certificate" "selected" {
-  count = var.acm_certificate_arn != null ? 1 : 0
-  
-  arn = var.acm_certificate_arn
-}
+# ACM証明書の検証は直接ARNを使用するため、データソースは不要
+# var.acm_certificate_arnを直接使用
 
 # -----------------------------------------------------------------------------
 # S3 Bucket Information (Optional)
 # -----------------------------------------------------------------------------
 
-data "aws_s3_bucket" "origin" {
-  count = var.origin_domain_name != null ? 1 : 0
-  
-  bucket = var.origin_domain_name
-} 
+# S3バケット情報は直接ドメイン名を使用するため、データソースは不要
+# var.origin_domain_nameを直接使用 

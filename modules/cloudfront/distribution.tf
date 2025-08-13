@@ -22,8 +22,13 @@ resource "aws_cloudfront_distribution" "main" {
     origin_id   = local.origin_config.origin_id
     origin_path = local.origin_config.origin_path
 
-    # S3オリジンアクセス制御
-    origin_access_control_id = aws_cloudfront_origin_access_control.main.id
+    # カスタムオリジン設定（EC2用）
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "http-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
   }
 
   # デフォルトキャッシュビヘイビアの設定
@@ -39,12 +44,7 @@ resource "aws_cloudfront_distribution" "main" {
     compress               = local.cache_behavior_config.compress
 
     # セキュリティヘッダーの設定
-    dynamic "response_headers_policy_id" {
-      for_each = var.enable_security_headers ? [1] : []
-      content {
-        response_headers_policy_id = aws_cloudfront_response_headers_policy.security[0].id
-      }
-    }
+    response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
 
     # 関数の設定
     dynamic "function_association" {
@@ -52,6 +52,18 @@ resource "aws_cloudfront_distribution" "main" {
       content {
         event_type   = function_association.value.event_type
         function_arn = function_association.value.function_arn
+      }
+    }
+
+    # リアルタイムログの設定
+    realtime_log_config_arn = var.enable_real_time_logs ? aws_cloudfront_realtime_log_config.main[0].arn : null
+
+    # ForwardedValuesの設定（EC2オリジン用）
+    forwarded_values {
+      query_string = true
+      headers      = ["Host", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"]
+      cookies {
+        forward = "all"
       }
     }
   }
@@ -85,6 +97,9 @@ resource "aws_cloudfront_distribution" "main" {
     minimum_protocol_version = local.security_config.minimum_protocol_version
   }
 
+  # カスタムドメイン（エイリアス）の設定
+  aliases = var.aliases
+
   # アクセスログの設定
   dynamic "logging_config" {
     for_each = var.enable_access_logs ? [1] : []
@@ -95,13 +110,7 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
-  # リアルタイムログの設定
-  dynamic "realtime_log_config_arn" {
-    for_each = var.enable_real_time_logs ? [1] : []
-    content {
-      realtime_log_config_arn = aws_cloudfront_realtime_log_config.main[0].arn
-    }
-  }
+  # リアルタイムログの設定はキャッシュビヘイビア内で設定
 
   tags = merge(
     local.common_tags,
@@ -114,7 +123,7 @@ resource "aws_cloudfront_distribution" "main" {
 }
 
 # -----------------------------------------------------------------------------
-# Origin Access Control
+# Origin Access Control (S3用 - 段階的削除のため一時的に残す)
 # -----------------------------------------------------------------------------
 
 resource "aws_cloudfront_origin_access_control" "main" {
@@ -173,6 +182,7 @@ resource "aws_cloudfront_realtime_log_config" "main" {
   count = var.enable_real_time_logs ? 1 : 0
   
   name   = "${var.project}-realtime-logs"
+  sampling_rate = 100
   fields = ["timestamp", "time-to-first-byte", "sc-status", "sc-bytes", "c-ip", "cs-method", "cs-host", "cs-uri-stem", "cs-bytes", "x-forwarded-for", "ssl-protocol", "ssl-cipher", "x-result-type", "x-forwarded-proto", "fle-status", "fle-encrypted-fields", "c-port", "time-taken", "x-forwarded-for-2", "sc-content-type", "sc-content-len", "sc-range-start", "sc-range-end"]
 
   endpoint {

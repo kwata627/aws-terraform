@@ -39,7 +39,7 @@ resource "aws_instance" "wordpress" {
 
   # ネットワーク設定
   subnet_id                   = var.subnet_id
-  vpc_security_group_ids      = [var.security_group_id]
+  vpc_security_group_ids      = var.security_group_id != null ? concat([var.security_group_id], var.security_group_ids) : var.security_group_ids
   associate_public_ip_address = var.associate_public_ip
 
   # ストレージ設定

@@ -52,6 +52,18 @@
   become: yes
   notify: restart apache
 
+- name: Update WordPress URLs in database if WordPress is installed
+  mysql_query:
+    login_db: "{{ wordpress_db_name }}"
+    login_host: "{{ wordpress_db_host | regex_replace(':.*', '') }}"
+    login_port: "{{ wordpress_db_host | regex_replace('.*:', '') | default('3306') }}"
+    login_user: "{{ wordpress_db_user }}"
+    login_password: "{{ wordpress_db_password }}"
+    query: "UPDATE wp_options SET option_value = '{{ 'https' if wordpress_force_ssl | default(false) else 'http' }}://{{ wordpress_domain | default(cloudfront_domain | default(ansible_public_ipv4 | default('localhost'))) }}' WHERE option_name IN ('home', 'siteurl');"
+  become: yes
+  when: wordpress_db_name is defined and wordpress_db_host is defined
+  ignore_errors: yes
+
 - name: Clean up temporary files
   file:
     path: /tmp/wordpress.tar.gz

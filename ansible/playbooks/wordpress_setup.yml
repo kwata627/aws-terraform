@@ -9,6 +9,8 @@
     wordpress_db_user: wordpress
     wordpress_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password') }}"
     wordpress_config_auto: true
+    ssh_private_key: "{{ lookup('file', '/tmp/terraform_ssh_key') }}"
+    ssh_public_key: "{{ lookup('file', '/tmp/terraform_ssh_key.pub') | default('') }}"
   
   roles:
     - system
@@ -21,5 +23,8 @@
 - name: Configure SSH for all servers
   hosts: all
   become: yes
+  vars:
+    ssh_private_key: "{{ lookup('file', '/tmp/terraform_ssh_key') }}"
+    ssh_public_key: "{{ lookup('file', '/tmp/terraform_ssh_key.pub') | default('') }}"
   roles:
     - ssh 

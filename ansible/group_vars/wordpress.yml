@@ -1,6 +1,6 @@
 ---
 # WordPressサーバー用変数
-wordpress_domain: "{{ ansible_public_ipv4 | default('') }}"
+wordpress_domain: "{{ domain_name | default('example.com') }}"
 wordpress_locale: ja
 wordpress_language: ja
 
@@ -30,8 +30,8 @@ wordpress_disallow_file_edit: true
 wordpress_disallow_file_mods: true
 
 # SSL設定（ACM証明書検証完了後に有効化）
-wordpress_force_ssl: false
-wordpress_ssl_admin: false
+wordpress_force_ssl: true
+wordpress_ssl_admin: true
 
 # 監視設定
 monitoring_interval_hours: 6

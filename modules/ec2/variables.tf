@@ -48,12 +48,26 @@ variable "subnet_id" {
   }
 }
 
-variable "security_group_id" {
-  description = "EC2インスタンス用のセキュリティグループID"
-  type        = string
+variable "security_group_ids" {
+  description = "EC2インスタンス用のセキュリティグループIDのリスト"
+  type        = list(string)
+  default     = []
   
   validation {
-    condition     = can(regex("^sg-[a-z0-9]+$", var.security_group_id))
+    condition = alltrue([
+      for sg_id in var.security_group_ids : can(regex("^sg-[a-z0-9]+$", sg_id))
+    ])
+    error_message = "有効なセキュリティグループIDを入力してください（例: sg-xxxxxxxx）。"
+  }
+}
+
+variable "security_group_id" {
+  description = "EC2インスタンス用のセキュリティグループID（後方互換性のため）"
+  type        = string
+  default     = null
+  
+  validation {
+    condition     = var.security_group_id == null || can(regex("^sg-[a-z0-9]+$", var.security_group_id))
     error_message = "有効なセキュリティグループIDを入力してください（例: sg-xxxxxxxx）。"
   }
 }

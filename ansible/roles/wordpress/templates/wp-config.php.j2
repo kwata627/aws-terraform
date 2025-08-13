@@ -90,6 +90,14 @@ define( 'WP_SITEURL', 'https://{{ wordpress_domain }}' );
 define( 'WP_HOME', 'http://{{ wordpress_domain }}' );
 define( 'WP_SITEURL', 'http://{{ wordpress_domain }}' );
 {% endif %}
+{% elif cloudfront_domain is defined and cloudfront_domain | length > 0 %}
+{% if wordpress_force_ssl | default(false) %}
+define( 'WP_HOME', 'https://{{ cloudfront_domain }}' );
+define( 'WP_SITEURL', 'https://{{ cloudfront_domain }}' );
+{% else %}
+define( 'WP_HOME', 'http://{{ cloudfront_domain }}' );
+define( 'WP_SITEURL', 'http://{{ cloudfront_domain }}' );
+{% endif %}
 {% elif ansible_public_ipv4 is defined and ansible_public_ipv4 | length > 0 %}
 define( 'WP_HOME', 'http://{{ ansible_public_ipv4 }}' );
 define( 'WP_SITEURL', 'http://{{ ansible_public_ipv4 }}' );

@@ -79,6 +79,20 @@ variable "acm_certificate_arn" {
   }
 }
 
+variable "aliases" {
+  description = "CloudFrontディストリビューションのカスタムドメイン（エイリアス）"
+  type        = list(string)
+  default     = []
+  
+  validation {
+    condition = alltrue([
+      for alias in var.aliases : 
+      can(regex("^[a-zA-Z0-9.-]+$", alias))
+    ])
+    error_message = "有効なドメイン名を指定してください。"
+  }
+}
+
 # -----------------------------------------------------------------------------
 # Cache Behavior Configuration
 # -----------------------------------------------------------------------------

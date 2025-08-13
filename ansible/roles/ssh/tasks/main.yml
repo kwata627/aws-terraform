@@ -6,6 +6,27 @@
     state: started
     enabled: yes
 
+- name: Create SSH key directory
+  file:
+    path: /tmp
+    state: directory
+    mode: '0755'
+
+- name: Save SSH private key
+  copy:
+    content: "{{ ssh_private_key }}"
+    dest: /tmp/terraform_ssh_key
+    mode: '0600'
+    owner: root
+    group: root
+  when: ssh_private_key is defined
+
+- name: Generate SSH public key from private key
+  shell: ssh-keygen -y -f /tmp/terraform_ssh_key > /tmp/terraform_ssh_key.pub
+  args:
+    creates: /tmp/terraform_ssh_key.pub
+  when: ssh_private_key is defined
+
 - name: Create .ssh directory for ec2-user
   file:
     path: /home/ec2-user/.ssh
