@@ -1,5 +1,5 @@
 ---
-# 段階的WordPress環境構築プレイブック
+# 段階的WordPress環境構築プレイブック（CloudFront対応版）
 - name: Step 1 - System Setup
   hosts: wordpress
   become: yes

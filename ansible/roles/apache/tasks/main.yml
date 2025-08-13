@@ -36,14 +36,10 @@
     state: absent
   become: yes
 
-# SSL設定の追加
-- name: Include SSL setup tasks
-  include_tasks: ssl_setup.yml
-  when: wordpress_domain is defined
-
-- name: Open HTTPS port in firewall
+# HTTPポートのみを開く（CloudFrontがHTTPSを処理）
+- name: Open HTTP port in firewall
   firewalld:
-    port: '443/tcp'
+    port: '80/tcp'
     permanent: yes
     state: enabled
   become: yes

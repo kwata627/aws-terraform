@@ -70,15 +70,14 @@
   become: yes
   notify: restart sshd
 
-# SSLセキュリティ設定
-- name: Create SSL security configuration
+# HTTPセキュリティ設定（CloudFrontがHTTPSを処理）
+- name: Create HTTP security configuration
   template:
-    src: ssl-security.conf.j2
-    dest: /etc/httpd/conf.d/ssl-security.conf
+    src: http-security.conf.j2
+    dest: /etc/httpd/conf.d/http-security.conf
     mode: '0644'
   become: yes
   notify: restart apache
-  when: wordpress_domain is defined
 
 - name: Configure SSL cipher preferences
   lineinfile:

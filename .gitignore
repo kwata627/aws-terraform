@@ -58,6 +58,10 @@ test_workflow/
 # Ansible artifacts
 ansible/inventory/hosts.yml
 ansible/*.retry
+ansible/roles/*/defaults/main.yml
+ansible/group_vars/*.yml
+ansible/host_vars/
+ansible/.env
 
 # Deployment artifacts
 *.tar.gz

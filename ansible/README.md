@@ -59,27 +59,51 @@ ansible/
 - **設定管理**: YAML/JSON設定ファイルの検証・読み込み・更新
 
 ### 環境変数による設定
+
+#### 1. 環境変数ファイルの作成
 ```bash
-# 基本設定
-export ENVIRONMENT="production"
-export PLAYBOOK="playbooks/wordpress_setup.yml"
-export DRY_RUN="false"
-export VERBOSE="false"
-export LOG_LEVEL="INFO"
+# テンプレートをコピー
+cp templates/env.template .env
+
+# 実際の値を設定
+vim .env
+
+# または、現在の環境の例を参考にする
+cp env.example.current .env
+```
+
+#### 2. 必須環境変数
+```bash
+# データベース設定（RDSとWordPressで同じ認証情報を使用）
+export WORDPRESS_DB_HOST="your-rds-endpoint:3306"
+export WORDPRESS_DB_NAME="wordpress"
+export WORDPRESS_DB_USER="your-db-user"        # RDSのユーザー名と同じ
+export WORDPRESS_DB_PASSWORD="your-db-password" # RDSのパスワードと同じ
 
 # SSH設定
 export SSH_USER="ec2-user"
-export SSH_PRIVATE_KEY_FILE="~/.ssh/id_rsa"
+export SSH_PRIVATE_KEY_FILE="~/.ssh/your-key.pem"
 
 # WordPress設定
-export WORDPRESS_DB_HOST="your-rds-endpoint"
-export WORDPRESS_DB_NAME="wordpress"
-export WORDPRESS_DB_USER="wordpress"
-export WORDPRESS_DB_PASSWORD="your-password"
+export WORDPRESS_DOMAIN="your-domain.com"
+export WORDPRESS_LOCALE="ja"
+export WORDPRESS_LANGUAGE="ja"
+```
 
-# AWS設定
-export AWS_REGION="ap-northeast-1"
-export AWS_PROFILE="default"
+#### 3. オプション環境変数
+```bash
+# PHP設定
+export PHP_MEMORY_LIMIT="256M"
+export PHP_MAX_EXECUTION_TIME="300"
+export PHP_DATE_TIMEZONE="Asia/Tokyo"
+
+# セキュリティ設定
+export WORDPRESS_DEBUG="false"
+export WORDPRESS_AUTOMATIC_UPDATER_DISABLED="true"
+
+# 監視設定
+export MONITORING_ENABLED="true"
+export LOG_RETENTION_DAYS="30"
 ```
 
 ## 🏗️ 使用方法
@@ -149,12 +173,13 @@ python3 generate_inventory.py
 
 ### apache
 - Apache HTTP Serverのインストール・設定
-- WordPress用の仮想ホスト設定
+- WordPress用の仮想ホスト設定（HTTPのみ）
 - セキュリティヘッダーの設定
-- SSL/TLS設定
+- CloudFront対応（HTTPSはCloudFrontで処理）
 
 ### php
-- PHPとモジュールのインストール
+- PHP 8.4とモジュールのインストール
+- PHP-FPMの設定と有効化
 - PHP設定の最適化
 - OPcache設定
 - セキュリティ設定
@@ -173,9 +198,9 @@ python3 generate_inventory.py
 - セキュリティヘッダー設定
 
 ### database
-- MySQLクライアントのインストール
-- データベース接続設定
-- 接続テスト
+- MariaDBクライアントのインストール
+- RDS接続設定（adminユーザー）
+- データベース接続テスト
 - バックアップ設定
 
 ### monitoring

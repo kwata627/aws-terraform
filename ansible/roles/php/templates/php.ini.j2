@@ -29,4 +29,4 @@ opcache.revalidate_freq = {{ php_opcache_revalidate_freq | default('2') }}
 opcache.fast_shutdown = {{ php_opcache_fast_shutdown | default('1') }}
 
 ; 日付設定
-date.timezone = {{ php_date_timezone | default('Asia/Tokyo') | trim }} 
+date.timezone = {{ php_date_timezone | default('Asia/Tokyo') | trim | replace(' ', '') }} 

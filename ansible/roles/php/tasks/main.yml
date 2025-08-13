@@ -3,15 +3,14 @@
 - name: Install PHP and required modules
   dnf:
     name:
-      - php
-      - php-mysqlnd
-      - php-gd
-      - php-mbstring
-      - php-xml
-      - php-curl
-      - php-json
-      - php-opcache
-      - php-zip
+      - php8.4
+      - php8.4-mysqlnd
+      - php8.4-gd
+      - php8.4-mbstring
+      - php8.4-xml
+      - php8.4-opcache
+      - php8.4-zip
+      - php8.4-modphp
     state: present
   become: yes
 
@@ -31,10 +30,9 @@
   become: yes
   when: php_fpm_enabled | default(false)
 
-- name: Enable and start PHP-FPM (if enabled)
+- name: Enable and start PHP-FPM
   service:
     name: php-fpm
     state: started
     enabled: yes
-  become: yes
-  when: php_fpm_enabled | default(false) 
+  become: yes 

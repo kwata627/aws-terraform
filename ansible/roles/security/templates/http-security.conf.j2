@@ -1,0 +1,30 @@
+# HTTP Security Configuration
+# This file contains HTTP security settings for CloudFront-based architecture
+
+# Security headers for HTTP connections
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options nosniff
+    Header always set X-Frame-Options DENY
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    # Note: HSTS header is handled by CloudFront, not the origin server
+</IfModule>
+
+# Disable server signature
+ServerTokens Prod
+ServerSignature Off
+
+# Security settings for file access
+<FilesMatch "\.(htaccess|htpasswd|ini|log|sh|sql|conf)$">
+    Require all denied
+</FilesMatch>
+
+# Protect wp-config.php
+<Files "wp-config.php">
+    Require all denied
+</Files>
+
+# Protect sensitive WordPress files
+<FilesMatch "^(wp-config\.php|readme\.html|license\.txt)$">
+    Require all denied
+</FilesMatch>

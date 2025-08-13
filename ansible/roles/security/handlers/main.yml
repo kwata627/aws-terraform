@@ -16,4 +16,10 @@
   service:
     name: firewalld
     state: reloaded
+  become: yes
+
+- name: restart apache
+  service:
+    name: httpd
+    state: restarted
   become: yes 

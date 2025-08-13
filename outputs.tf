@@ -569,7 +569,7 @@ output "connection_info" {
   value = {
     wordpress_url = "http://${try(module.ec2.public_ip, "N/A")}"
     wordpress_https_url = "https://${var.domain_name}"
-    ssh_command = "ssh -i ssh_key.pem ec2-user@${try(module.ec2.public_ip, "N/A")}"
+    ssh_command = "ssh -i ~/.ssh/wordpress_key ec2-user@${try(module.ec2.public_ip, "N/A")}"
     rds_connection_string = "mysql://root:${var.db_password}@${try(module.rds.db_endpoint, "N/A")}:${try(module.rds.db_port, "3306")}/wordpress"
   }
   sensitive = true
