@@ -206,6 +206,17 @@ variable "enable_cloudfront" {
   }
 }
 
+variable "auto_update_nameservers" {
+  description = "ドメインのネームサーバーを自動で更新するかどうか"
+  type        = bool
+  default     = true
+  
+  validation {
+    condition     = contains([true, false], var.auto_update_nameservers)
+    error_message = "auto_update_nameserversは true または false である必要があります。"
+  }
+}
+
 variable "db_password" {
   description = "RDSマスターパスワード（必須）"
   type        = string

@@ -278,6 +278,53 @@ resource "null_resource" "cloudfront_cname_cleanup" {
 }
 
 # -----------------------------------------------------------------------------
+# ドメインネームサーバー自動更新機能
+# -----------------------------------------------------------------------------
+
+# ネームサーバー更新必要性チェック
+data "external" "nameserver_update_check" {
+  count = var.auto_update_nameservers ? 1 : 0
+  
+  program = ["bash", "${path.module}/scripts/check_nameserver_update.sh"]
+  
+  query = {
+    domain_name = local.domain_config.domain_name
+    nameserver1 = module.route53.name_servers[0]
+    nameserver2 = module.route53.name_servers[1]
+    nameserver3 = module.route53.name_servers[2]
+    nameserver4 = module.route53.name_servers[3]
+  }
+  
+  depends_on = [module.route53]
+}
+
+# ドメインネームサーバーの自動更新
+resource "null_resource" "nameserver_update" {
+  count = var.auto_update_nameservers && try(data.external.nameserver_update_check[0].result.needs_update, false) ? 1 : 0
+  
+  triggers = {
+    domain_name = local.domain_config.domain_name
+    nameserver1 = module.route53.name_servers[0]
+    nameserver2 = module.route53.name_servers[1]
+    nameserver3 = module.route53.name_servers[2]
+    nameserver4 = module.route53.name_servers[3]
+  }
+  
+  provisioner "local-exec" {
+    command = <<-EOT
+      ${path.module}/scripts/update_domain_nameservers.sh \
+        "${local.domain_config.domain_name}" \
+        "${module.route53.name_servers[0]}" \
+        "${module.route53.name_servers[1]}" \
+        "${module.route53.name_servers[2]}" \
+        "${module.route53.name_servers[3]}"
+    EOT
+  }
+  
+  depends_on = [data.external.nameserver_update_check]
+}
+
+# -----------------------------------------------------------------------------
 # ACM Module
 # -----------------------------------------------------------------------------
 

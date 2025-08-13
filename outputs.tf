@@ -510,6 +510,20 @@ output "cloudfront_distribution_status" {
 }
 
 # -----------------------------------------------------------------------------
+# ネームサーバー更新情報
+# -----------------------------------------------------------------------------
+
+output "nameserver_update_status" {
+  description = "ネームサーバー更新の状況"
+  value = var.auto_update_nameservers ? {
+    needs_update = try(data.external.nameserver_update_check[0].result.needs_update, false)
+    reason       = try(data.external.nameserver_update_check[0].result.reason, "unknown")
+    current_ns   = try(data.external.nameserver_update_check[0].result.current_ns, null)
+    target_ns    = module.route53.name_servers
+  } : null
+}
+
+# -----------------------------------------------------------------------------
 # Module Status Information
 # -----------------------------------------------------------------------------
 
