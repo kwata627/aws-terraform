@@ -191,6 +191,21 @@ variable "rds_identifier" {
   }
 }
 
+# -----------------------------------------------------------------------------
+# CloudFront Configuration
+# -----------------------------------------------------------------------------
+
+variable "enable_cloudfront" {
+  description = "CloudFrontディストリビューションを有効にするかどうか"
+  type        = bool
+  default     = true
+  
+  validation {
+    condition     = contains([true, false], var.enable_cloudfront)
+    error_message = "enable_cloudfrontは true または false である必要があります。"
+  }
+}
+
 variable "db_password" {
   description = "RDSマスターパスワード（必須）"
   type        = string

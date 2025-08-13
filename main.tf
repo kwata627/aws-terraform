@@ -238,6 +238,46 @@ module "s3" {
 }
 
 # -----------------------------------------------------------------------------
+# CloudFront CNAME自動対処機能
+# -----------------------------------------------------------------------------
+
+# CloudFront CNAMEレコードの存在チェック
+data "external" "cloudfront_cname_check" {
+  count = var.enable_cloudfront ? 1 : 0
+  
+  program = ["bash", "${path.module}/scripts/check_cloudfront_cname.sh"]
+  
+  query = {
+    domain_name = local.domain_config.domain_name
+    hosted_zone_id = module.route53.zone_id
+  }
+  
+  depends_on = [module.route53]
+}
+
+# CloudFront CNAMEレコードの自動クリーンアップ
+resource "null_resource" "cloudfront_cname_cleanup" {
+  count = var.enable_cloudfront && try(data.external.cloudfront_cname_check[0].result.needs_cleanup, false) ? 1 : 0
+  
+  triggers = {
+    domain_name = local.domain_config.domain_name
+    hosted_zone_id = module.route53.zone_id
+    record_value = try(data.external.cloudfront_cname_check[0].result.record_value, "")
+  }
+  
+  provisioner "local-exec" {
+    command = <<-EOT
+      ${path.module}/scripts/cleanup_cloudfront_cname.sh \
+        "${local.domain_config.domain_name}" \
+        "${module.route53.zone_id}" \
+        "${try(data.external.cloudfront_cname_check[0].result.record_value, "")}"
+    EOT
+  }
+  
+  depends_on = [data.external.cloudfront_cname_check]
+}
+
+# -----------------------------------------------------------------------------
 # ACM Module
 # -----------------------------------------------------------------------------
 
@@ -262,6 +302,7 @@ module "acm" {
 # -----------------------------------------------------------------------------
 
 module "cloudfront" {
+  count                 = var.enable_cloudfront ? 1 : 0
   source                = "./modules/cloudfront"
   project               = var.project
   origin_domain_name    = module.ec2.public_dns
@@ -270,7 +311,7 @@ module "cloudfront" {
   environment           = local.environment_config.name
   tags                  = local.common_tags
   
-  depends_on = [module.acm, module.ec2]
+  depends_on = [module.acm, module.ec2, null_resource.cloudfront_cname_cleanup]
 }
 
 # -----------------------------------------------------------------------------
@@ -285,7 +326,7 @@ module "route53" {
   # ドメイン設定
   domain_name = local.domain_config.domain_name
   wordpress_ip = module.ec2.public_ip
-  cloudfront_domain_name = "d7kh2g6g16s8m.cloudfront.net"
+  cloudfront_domain_name = var.enable_cloudfront ? module.cloudfront[0].domain_name : ""
   # certificate_validation_records = module.acm.validation_records # ACMモジュールで自動作成するため削除
   
   # ドメイン登録設定（分析結果に基づいて決定）

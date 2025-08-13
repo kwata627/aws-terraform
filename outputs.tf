@@ -491,22 +491,22 @@ output "validation_rds_endpoint" {
 
 output "cloudfront_distribution_id" {
   description = "CloudFrontディストリビューションのID"
-  value       = try(module.cloudfront.distribution_id, null)
+  value       = var.enable_cloudfront ? try(module.cloudfront[0].distribution_id, null) : null
 }
 
 output "cloudfront_domain_name" {
   description = "CloudFrontディストリビューションのドメイン名"
-  value       = try(module.cloudfront.domain_name, null)
+  value       = var.enable_cloudfront ? try(module.cloudfront[0].domain_name, null) : null
 }
 
 output "cloudfront_distribution_arn" {
   description = "CloudFrontディストリビューションのARN"
-  value       = try(module.cloudfront.distribution_arn, null)
+  value       = var.enable_cloudfront ? try(module.cloudfront[0].distribution_arn, null) : null
 }
 
 output "cloudfront_distribution_status" {
   description = "CloudFrontディストリビューションのステータス"
-  value       = try(module.cloudfront.distribution_status, null)
+  value       = var.enable_cloudfront ? try(module.cloudfront[0].distribution_status, null) : null
 }
 
 # -----------------------------------------------------------------------------
