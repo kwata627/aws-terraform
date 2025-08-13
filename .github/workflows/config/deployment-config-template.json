@@ -1,36 +1,36 @@
 {
     "production": {
-        "ec2_instance_id": "",
-        "rds_identifier": "wp-shamo-rds",
-        "wordpress_url": "http://shamonooyuuhan.com",
-        "backup_retention_days": 7,
-        "ssh_user": "ubuntu",
-        "ssh_key_path": "~/.ssh/id_rsa"
+        "ec2_instance_id": "${PROD_EC2_INSTANCE_ID:-}",
+        "rds_identifier": "${PROD_RDS_IDENTIFIER:-${PROJECT:-wordpress}-rds}",
+        "wordpress_url": "${PROD_WORDPRESS_URL:-https://${DOMAIN_NAME:-example.com}}",
+        "backup_retention_days": "${BACKUP_RETENTION_DAYS:-7}",
+        "ssh_user": "${SSH_USER:-ec2-user}",
+        "ssh_key_path": "${SSH_KEY_PATH:-ssh_key.pem}"
     },
     "validation": {
-        "ec2_instance_id": "",
-        "rds_identifier": "wp-shamo-rds-validation",
-        "wordpress_url": "http://validation-ip",
-        "test_timeout_minutes": 30,
-        "ssh_user": "ubuntu",
-        "ssh_key_path": "~/.ssh/id_rsa"
+        "ec2_instance_id": "${VALID_EC2_INSTANCE_ID:-}",
+        "rds_identifier": "${VALID_RDS_IDENTIFIER:-${PROJECT:-wordpress}-rds-validation}",
+        "wordpress_url": "${VALID_WORDPRESS_URL:-http://validation-ip}",
+        "test_timeout_minutes": "${TEST_TIMEOUT_MINUTES:-30}",
+        "ssh_user": "${SSH_USER:-ec2-user}",
+        "ssh_key_path": "${SSH_KEY_PATH:-ssh_key.pem}"
     },
     "deployment": {
-        "auto_approve": false,
-        "rollback_on_failure": true,
-        "notification_email": "",
-        "backup_before_deployment": true,
-        "test_validation_environment": true,
-        "stop_validation_after_deployment": true
+        "auto_approve": "${AUTO_APPROVE:-false}",
+        "rollback_on_failure": "${ROLLBACK_ON_FAILURE:-true}",
+        "notification_email": "${NOTIFICATION_EMAIL:-}",
+        "backup_before_deployment": "${BACKUP_BEFORE_DEPLOYMENT:-true}",
+        "test_validation_environment": "${TEST_VALIDATION_ENVIRONMENT:-true}",
+        "stop_validation_after_deployment": "${STOP_VALIDATION_AFTER_DEPLOYMENT:-true}"
     },
     "aws": {
-        "region": "ap-northeast-1",
-        "profile": "default",
-        "max_retries": 3
+        "region": "${AWS_REGION:-ap-northeast-1}",
+        "profile": "${AWS_PROFILE:-default}",
+        "max_retries": "${AWS_MAX_RETRIES:-3}"
     },
     "github": {
-        "repository": "owner/repo",
-        "branch": "main",
-        "workflow_id": "wordpress-deployment.yml"
+        "repository": "${GITHUB_REPOSITORY:-owner/repo}",
+        "branch": "${GITHUB_BRANCH:-main}",
+        "workflow_id": "${GITHUB_WORKFLOW_ID:-wordpress-deployment.yml}"
     }
 } 

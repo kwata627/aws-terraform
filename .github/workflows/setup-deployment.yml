@@ -121,7 +121,7 @@ jobs:
                 "wordpress_url": "https://${{ github.event.inputs.domain_name }}",
                 "backup_retention_days": 7,
                 "ssh_user": "ec2-user",
-                "ssh_key_path": "~/.ssh/id_rsa"
+                "ssh_key_path": "ssh_key.pem"
             },
             "validation": {
                 "ec2_instance_id": "${{ steps.terraform_outputs.outputs.valid_ec2_id }}",
@@ -129,7 +129,7 @@ jobs:
                 "wordpress_url": "http://validation-ip",
                 "test_timeout_minutes": 30,
                 "ssh_user": "ec2-user",
-                "ssh_key_path": "~/.ssh/id_rsa"
+                "ssh_key_path": "ssh_key.pem"
             },
             "deployment": {
                 "auto_approve": false,
@@ -178,13 +178,13 @@ jobs:
         
     - name: Setup SSH key
       run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
+        # Setup SSH key as ssh_key.pem (matching Terraform output)
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ssh_key.pem
+        chmod 600 ssh_key.pem
         
         # Test SSH key
         if [ -n "${{ steps.terraform_outputs.outputs.prod_ec2_id }}" ]; then
-          echo "✅ SSH key configured"
+          echo "✅ SSH key configured as ssh_key.pem"
         else
           echo "⚠️ SSH key configured but EC2 instance not available"
         fi
