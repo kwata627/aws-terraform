@@ -1,3 +1,19 @@
 ---
 # SSHロールのデフォルト変数
-ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBdeowGnmt4rIevee27PwvMXKhdn6bA1WqC3Tk0BAL6S kwata627@wata-pc" 
+
+# SSH鍵設定
+ssh_private_key: "{{ lookup('env', 'SSH_PRIVATE_KEY_PATH') | default('/tmp/ssh_key.pem') }}"
+ssh_public_key: "{{ lookup('env', 'SSH_PUBLIC_KEY_PATH') | default('/tmp/ssh_key.pub') }}"
+
+# SSH鍵ファイルパス設定
+ssh_key_file_path: "{{ lookup('env', 'SSH_KEY_FILE_PATH') | default('/tmp/ssh_key.pem') }}"
+ssh_public_key_file_path: "{{ lookup('env', 'SSH_PUBLIC_KEY_FILE_PATH') | default('/tmp/ssh_key.pub') }}"
+
+# SSH鍵生成設定
+ssh_generate_public_key: "{{ lookup('env', 'SSH_GENERATE_PUBLIC_KEY') | default(false) }}"
+
+# SSH設定
+ssh_user: "ec2-user"
+ssh_port: 22
+ssh_password_authentication: false
+ssh_pubkey_authentication: true 

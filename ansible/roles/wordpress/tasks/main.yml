@@ -21,6 +21,7 @@
     mode: '0644'
     owner: apache
     group: apache
+    remote_src: yes
   become: yes
   notify: restart apache
 

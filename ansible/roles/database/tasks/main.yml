@@ -82,4 +82,34 @@
       Database Host: {{ wordpress_db_host | default('Not set') }}
       Database Name: {{ wordpress_db_name | default('Not set') }}
       Database User: {{ wordpress_db_user | default('Not set') }}
-    verbosity: 1 
+    verbosity: 1
+
+- name: Create WordPress database user
+  mysql_query:
+    login_host: "{{ rds_host | default(wordpress_db_host) }}"
+    login_port: "{{ rds_port | default('3306') }}"
+    login_user: "{{ wp_admin_user | default('admin') }}"
+    login_password: "{{ wp_admin_password | default('password') }}"
+    query: "CREATE USER IF NOT EXISTS '{{ wordpress_db_user }}'@'%' IDENTIFIED BY '{{ wordpress_db_password }}';"
+  become: yes
+  ignore_errors: yes
+
+- name: Grant privileges to WordPress database user
+  mysql_query:
+    login_host: "{{ rds_host | default(wordpress_db_host) }}"
+    login_port: "{{ rds_port | default('3306') }}"
+    login_user: "{{ wp_admin_user | default('admin') }}"
+    login_password: "{{ wp_admin_password | default('password') }}"
+    query: "GRANT ALL PRIVILEGES ON `{{ wordpress_db_name }}`.* TO '{{ wordpress_db_user }}'@'%';"
+  become: yes
+  ignore_errors: yes
+
+- name: Flush privileges
+  mysql_query:
+    login_host: "{{ rds_host | default(wordpress_db_host) }}"
+    login_port: "{{ rds_port | default('3306') }}"
+    login_user: "{{ wp_admin_user | default('admin') }}"
+    login_password: "{{ wp_admin_password | default('password') }}"
+    query: "FLUSH PRIVILEGES;"
+  become: yes
+  ignore_errors: yes 

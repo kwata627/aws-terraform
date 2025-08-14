@@ -170,4 +170,23 @@ resource "aws_iam_role_policy" "ssh_rotation" {
       }
     ]
   })
+}
+
+# -----------------------------------------------------------------------------
+# SSH Key File Creation (for Ansible)
+# -----------------------------------------------------------------------------
+
+resource "null_resource" "ssh_key_files" {
+  triggers = {
+    private_key = tls_private_key.ssh.private_key_pem
+    public_key = tls_private_key.ssh.public_key_openssh
+  }
+  
+  provisioner "local-exec" {
+    command = "echo '${tls_private_key.ssh.private_key_pem}' > /tmp/${aws_key_pair.ssh.key_name}.pem && chmod 600 /tmp/${aws_key_pair.ssh.key_name}.pem"
+  }
+  
+  provisioner "local-exec" {
+    command = "echo '${tls_private_key.ssh.public_key_openssh}' > /tmp/${aws_key_pair.ssh.key_name}.pub && chmod 644 /tmp/${aws_key_pair.ssh.key_name}.pub"
+  }
 } 

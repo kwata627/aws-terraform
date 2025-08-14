@@ -4,4 +4,8 @@ wordpress_db_host: "{{ lookup('env', 'WORDPRESS_DB_HOST') | default('localhost')
 wordpress_db_user: "{{ lookup('env', 'WORDPRESS_DB_USER') | default('wordpress', true) }}"
 wordpress_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password', true) }}"
 wordpress_db_name: "{{ lookup('env', 'WORDPRESS_DB_NAME') | default('wordpress') }}"
-wordpress_db_charset: "{{ lookup('env', 'WORDPRESS_DB_CHARSET') | default('utf8mb4') }}" 
+wordpress_db_charset: "{{ lookup('env', 'WORDPRESS_DB_CHARSET') | default('utf8mb4') }}"
+
+# 管理者ユーザー設定（データベースユーザー作成用）
+wp_admin_user: "{{ lookup('env', 'WP_ADMIN_USER') | default('admin') }}"
+wp_admin_password: "{{ lookup('env', 'WP_ADMIN_PASSWORD') | default('password') }}" 

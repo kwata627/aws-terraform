@@ -14,8 +14,8 @@
     wordpress_domain: "{{ lookup('env', 'WORDPRESS_DOMAIN') | default('example.com') }}"
     
     # SSH設定
-    ssh_private_key: "{{ lookup('file', '/tmp/terraform_ssh_key') }}"
-    ssh_public_key: "{{ lookup('file', '/tmp/terraform_ssh_key.pub') | default('') }}"
+    ssh_private_key: "{{ lookup('env', 'SSH_PRIVATE_KEY_PATH') | default('/tmp/wp-sample-key.pem') }}"
+    ssh_public_key: "{{ lookup('env', 'SSH_PUBLIC_KEY_PATH') | default('/tmp/wp-sample-key.pub') }}"
     
     # PHP-FPM設定
     php_fpm_enabled: true
@@ -39,7 +39,7 @@
   hosts: all
   become: yes
   vars:
-    ssh_private_key: "{{ lookup('file', '/tmp/terraform_ssh_key') }}"
-    ssh_public_key: "{{ lookup('file', '/tmp/terraform_ssh_key.pub') | default('') }}"
+    ssh_private_key: "{{ lookup('env', 'SSH_PRIVATE_KEY_PATH') | default('/tmp/wp-sample-key.pem') }}"
+    ssh_public_key: "{{ lookup('env', 'SSH_PUBLIC_KEY_PATH') | default('/tmp/wp-sample-key.pub') }}"
   roles:
     - ssh 

@@ -12,6 +12,11 @@ wp_table_prefix: "wp_"
 wp_debug: false
 wp_lang: "ja"
 
+# SSL設定
+wp_force_ssl_admin: true
+wp_force_ssl_login: true
+wp_cache_enabled: false
+
 # セキュリティ設定
 wp_automatic_updater_disabled: true
 wp_disallow_file_edit: true

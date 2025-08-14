@@ -83,17 +83,24 @@ define( 'WP_HOME', 'https://{{ wordpress_domain | default('example.com') }}' );
 define( 'WP_SITEURL', 'https://{{ wordpress_domain | default('example.com') }}' );
 
 // =============================================================================
+// 管理画面URL設定（直接アクセス用）
+// =============================================================================
+
+/** 管理画面のURL（直接アクセス推奨） */
+define( 'WP_ADMIN_URL', 'https://admin.{{ wordpress_domain | default('example.com') }}' );
+
+// =============================================================================
 // SSL設定
 // =============================================================================
 
 /** 管理画面を強制的にSSLでアクセス */
-define( 'FORCE_SSL_ADMIN', true );
+define( 'FORCE_SSL_ADMIN', {{ wp_force_ssl_admin | default(true) | lower }} );
 
 /** ログインを強制的にSSLでアクセス */
-define( 'FORCE_SSL_LOGIN', true );
+define( 'FORCE_SSL_LOGIN', {{ wp_force_ssl_login | default(true) | lower }} );
 
 /** キャッシュを無効化 */
-define( 'WP_CACHE', false );
+define( 'WP_CACHE', {{ wp_cache_enabled | default(false) | lower }} );
 
 // =============================================================================
 // CloudFront HTTPS 検出

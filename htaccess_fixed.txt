@@ -2,10 +2,11 @@
 <IfModule mod_rewrite.c>
 RewriteEngine On
 
-# CloudFront経由でない場合のHTTPSリダイレクト
+# CloudFront経由でない場合のみHTTPSリダイレクト（CloudFront経由の場合は無効）
 RewriteCond %{HTTP:X-Forwarded-Proto} !https
 RewriteCond %{HTTPS} off
 RewriteCond %{HTTP_HOST} ^shamolife\.com$ [NC]
+RewriteCond %{HTTP:X-Forwarded-For} ^$
 RewriteRule ^(.*)$ https://shamolife.com/$1 [R=301,L]
 
 RewriteBase /

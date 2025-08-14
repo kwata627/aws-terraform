@@ -36,10 +36,19 @@
     state: absent
   become: yes
 
-# HTTPポートのみを開く（CloudFrontがHTTPSを処理）
+# HTTPポートを開く（CloudFrontがHTTPSを処理）
 - name: Open HTTP port in firewall
   firewalld:
     port: '80/tcp'
+    permanent: yes
+    state: enabled
+  become: yes
+  notify: restart firewalld
+
+# HTTPSポートを開く（管理画面用の直接アクセス）
+- name: Open HTTPS port in firewall
+  firewalld:
+    port: '443/tcp'
     permanent: yes
     state: enabled
   become: yes

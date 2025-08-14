@@ -4,7 +4,7 @@
   mysql_query:
     login_db: "{{ wp_db_name }}"
     login_host: "{{ wp_db_host | regex_replace(':.*', '') }}"
-    login_port: "{{ wp_db_host | regex_replace('.*:', '') | default('3306') }}"
+    login_port: "{{ (wp_db_host | regex_replace('.*:', '') | default('3306')) | int }}"
     login_user: "{{ wp_db_user }}"
     login_password: "{{ wp_db_password }}"
     query: "SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = '{{ wp_db_name }}' AND table_name LIKE '{{ wp_table_prefix }}%';"
@@ -13,14 +13,30 @@
   when: wp_db_name is defined and wp_db_host is defined
   ignore_errors: yes
 
-- name: Update WordPress URLs in database
+- name: Update WordPress home URL in database
   mysql_query:
     login_db: "{{ wp_db_name }}"
     login_host: "{{ wp_db_host | regex_replace(':.*', '') }}"
-    login_port: "{{ wp_db_host | regex_replace('.*:', '') | default('3306') }}"
+    login_port: "{{ (wp_db_host | regex_replace('.*:', '') | default('3306')) | int }}"
     login_user: "{{ wp_db_user }}"
     login_password: "{{ wp_db_password }}"
-{{ wordpress_domain | default('example.com') }}' WHERE    query: "UPDATE {{ wp_table_prefix }}options SET option_value = 'https:// option_name IN ('home', 'siteurl');"
+    query: "UPDATE {{ wp_table_prefix }}options SET option_value = 'https://{{ wordpress_domain | default('example.com') }}' WHERE option_name = 'home';"
+  become: yes
+  when: 
+    - wp_db_name is defined 
+    - wp_db_host is defined
+    - wp_tables_check is defined
+    - wp_tables_check.query_result is defined
+    - wp_tables_check.query_result[0].count | int > 0
+
+- name: Update WordPress site URL in database
+  mysql_query:
+    login_db: "{{ wp_db_name }}"
+    login_host: "{{ wp_db_host | regex_replace(':.*', '') }}"
+    login_port: "{{ (wp_db_host | regex_replace('.*:', '') | default('3306')) | int }}"
+    login_user: "{{ wp_db_user }}"
+    login_password: "{{ wp_db_password }}"
+    query: "UPDATE {{ wp_table_prefix }}options SET option_value = 'https://admin.{{ wordpress_domain | default('example.com') }}' WHERE option_name = 'siteurl';"
   become: yes
   when: 
     - wp_db_name is defined 
@@ -33,7 +49,7 @@
   mysql_query:
     login_db: "{{ wp_db_name }}"
     login_host: "{{ wp_db_host | regex_replace(':.*', '') }}"
-    login_port: "{{ wp_db_host | regex_replace('.*:', '') | default('3306') }}"
+    login_port: "{{ (wp_db_host | regex_replace('.*:', '') | default('3306')) | int }}"
     login_user: "{{ wp_db_user }}"
     login_password: "{{ wp_db_password }}"
     query: "INSERT INTO {{ wp_table_prefix }}options (option_name, option_value, autoload) VALUES ('force_ssl_admin', '1', 'yes') ON DUPLICATE KEY UPDATE option_value = '1';"
@@ -49,7 +65,7 @@
   mysql_query:
     login_db: "{{ wp_db_name }}"
     login_host: "{{ wp_db_host | regex_replace(':.*', '') }}"
-    login_port: "{{ wp_db_host | regex_replace('.*:', '') | default('3306') }}"
+    login_port: "{{ (wp_db_host | regex_replace('.*:', '') | default('3306')) | int }}"
     login_user: "{{ wp_db_user }}"
     login_password: "{{ wp_db_password }}"
     query: "INSERT INTO {{ wp_table_prefix }}options (option_name, option_value, autoload) VALUES ('force_ssl_login', '1', 'yes') ON DUPLICATE KEY UPDATE option_value = '1';"
@@ -65,7 +81,7 @@
   mysql_query:
     login_db: "{{ wp_db_name }}"
     login_host: "{{ wp_db_host | regex_replace(':.*', '') }}"
-    login_port: "{{ wp_db_host | regex_replace('.*:', '') | default('3306') }}"
+    login_port: "{{ (wp_db_host | regex_replace('.*:', '') | default('3306')) | int }}"
     login_user: "{{ wp_db_user }}"
     login_password: "{{ wp_db_password }}"
     query: "DELETE FROM {{ wp_table_prefix }}options WHERE option_name LIKE '%_transient_%';"

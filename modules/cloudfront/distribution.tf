@@ -65,48 +65,12 @@ resource "aws_cloudfront_distribution" "main" {
   }
 
   # 順序付きキャッシュビヘイビア（WordPress最適化が有効な場合のみ）
+  # 注意: /wp-admin/* と /wp-login.php は除外（直接アクセス推奨）
+  
   dynamic "ordered_cache_behavior" {
     for_each = var.enable_wordpress_optimization ? [1] : []
     content {
-      # 1. 管理画面（最優先）
-      path_pattern           = "/wp-admin/*"
-      target_origin_id       = local.cache_behavior_config.target_origin_id
-      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
-
-      allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
-      cached_methods  = ["GET", "HEAD"]
-
-      compress = true
-
-      cache_policy_id            = aws_cloudfront_cache_policy.caching_disabled.id
-      origin_request_policy_id   = aws_cloudfront_origin_request_policy.all_to_origin.id
-      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
-    }
-  }
-
-  dynamic "ordered_cache_behavior" {
-    for_each = var.enable_wordpress_optimization ? [1] : []
-    content {
-      # 2. ログインページ
-      path_pattern           = "/wp-login.php"
-      target_origin_id       = local.cache_behavior_config.target_origin_id
-      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
-
-      allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
-      cached_methods  = ["GET", "HEAD"]
-
-      compress = true
-
-      cache_policy_id            = aws_cloudfront_cache_policy.caching_disabled.id
-      origin_request_policy_id   = aws_cloudfront_origin_request_policy.all_to_origin.id
-      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
-    }
-  }
-
-  dynamic "ordered_cache_behavior" {
-    for_each = var.enable_wordpress_optimization ? [1] : []
-    content {
-      # 3. 静的アセット（CSS）
+      # 1. 静的アセット（CSS）
       path_pattern           = "*.css"
       target_origin_id       = local.cache_behavior_config.target_origin_id
       viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
@@ -125,7 +89,7 @@ resource "aws_cloudfront_distribution" "main" {
   dynamic "ordered_cache_behavior" {
     for_each = var.enable_wordpress_optimization ? [1] : []
     content {
-      # 4. 静的アセット（JavaScript）
+      # 2. 静的アセット（JavaScript）
       path_pattern           = "*.js"
       target_origin_id       = local.cache_behavior_config.target_origin_id
       viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy

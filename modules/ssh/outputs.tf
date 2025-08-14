@@ -50,6 +50,16 @@ output "public_key_pem" {
   value       = tls_private_key.ssh.public_key_pem
 }
 
+output "private_key_path" {
+  description = "秘密鍵のファイルパス（Ansible用）"
+  value       = "/tmp/${aws_key_pair.ssh.key_name}.pem"
+}
+
+output "public_key_path" {
+  description = "公開鍵のファイルパス（Ansible用）"
+  value       = "/tmp/${aws_key_pair.ssh.key_name}.pub"
+}
+
 # -----------------------------------------------------------------------------
 # SSH Key Configuration
 # -----------------------------------------------------------------------------
