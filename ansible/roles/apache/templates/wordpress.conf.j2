@@ -1,6 +1,7 @@
 # WordPress VirtualHost (HTTP Only - CloudFront handles HTTPS)
 <VirtualHost *:80>
-    ServerName {{ ansible_default_ipv4.address | default(wordpress_domain) | default('localhost') }}
+    ServerName {{ wordpress_domain | default('example.com') }}
+    ServerAlias {{ ansible_default_ipv4.address | default('localhost') }}
     DocumentRoot /var/www/html
     
     <Directory /var/www/html>

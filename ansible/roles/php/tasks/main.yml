@@ -10,7 +10,7 @@
       - php8.4-xml
       - php8.4-opcache
       - php8.4-zip
-      - php8.4-modphp
+      - php8.4-fpm
     state: present
   become: yes
 
@@ -29,6 +29,7 @@
     mode: '0644'
   become: yes
   when: php_fpm_enabled | default(false)
+  notify: restart php-fpm
 
 - name: Enable and start PHP-FPM
   service:

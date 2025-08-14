@@ -9,6 +9,7 @@
     wordpress_db_user: admin
     wordpress_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password') }}"
     wordpress_config_auto: true
+    wordpress_domain: "{{ lookup('env', 'WORDPRESS_DOMAIN') | default('example.com') }}"
     ssh_private_key: "{{ lookup('file', '/tmp/terraform_ssh_key') }}"
     ssh_public_key: "{{ lookup('file', '/tmp/terraform_ssh_key.pub') | default('') }}"
   

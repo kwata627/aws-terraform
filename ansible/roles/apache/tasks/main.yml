@@ -57,4 +57,30 @@
     name: httpd
     enabled: yes
     daemon_reload: yes
-  become: yes 
+  become: yes
+
+# PHP-FPMとの連携設定
+- name: Create backup of mod_php configuration
+  copy:
+    src: /etc/httpd/conf.modules.d/20-php.conf
+    dest: /etc/httpd/conf.modules.d/20-php.conf.backup
+    remote_src: yes
+  become: yes
+  when: ansible_check_mode is not defined
+  ignore_errors: yes
+
+- name: Disable mod_php configuration
+  file:
+    path: /etc/httpd/conf.modules.d/20-php.conf
+    state: absent
+  become: yes
+  notify: restart apache
+
+- name: Ensure mod_proxy_fcgi is enabled
+  lineinfile:
+    path: /etc/httpd/conf.modules.d/00-proxy.conf
+    regexp: '^LoadModule proxy_fcgi_module'
+    line: 'LoadModule proxy_fcgi_module modules/mod_proxy_fcgi.so'
+    state: present
+  become: yes
+  notify: restart apache 

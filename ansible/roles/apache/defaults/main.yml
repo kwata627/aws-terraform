@@ -1,6 +1,6 @@
 ---
 # Apacheロールのデフォルト変数
-wordpress_domain: localhost
+wordpress_domain: example.com
 apache_user: apache
 apache_group: apache
 document_root: /var/www/html

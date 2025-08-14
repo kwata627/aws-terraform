@@ -31,4 +31,4 @@ php_opcache_fast_shutdown: '1'
 php_date_timezone: 'Asia/Tokyo'
 
 # PHP-FPM設定
-php_fpm_enabled: false 
+php_fpm_enabled: true 

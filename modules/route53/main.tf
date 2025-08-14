@@ -394,28 +394,30 @@ resource "aws_route53_record" "nameservers" {
   )
 }
 
-# WordPress用Aレコード
-resource "aws_route53_record" "wordpress" {
-  zone_id = local.hosted_zone_id
-  name    = local.normalized_domain_name
-  type    = "A"
-  ttl     = "300"
-  records = var.wordpress_ip != "" ? [var.wordpress_ip] : []
+# WordPress用Aレコード（CloudFront経由のため無効化）
+# resource "aws_route53_record" "wordpress" {
+#   zone_id = local.hosted_zone_id
+#   name    = local.normalized_domain_name
+#   type    = "A"
+#   ttl     = "300"
+#   records = var.wordpress_ip != "" ? [var.wordpress_ip] : []
+# 
+#   # Route53レコードではタグは使用できないため削除
+# }
 
-  # Route53レコードではタグは使用できないため削除
-}
-
-# CloudFront用CNAMEレコード（手動で作成するため無効化）
+# CloudFront用CNAMEレコード（一時的に無効化）
 # resource "aws_route53_record" "cloudfront" {
 #   count = var.cloudfront_domain_name != "" && var.cloudfront_domain_name != "placeholder.cloudfront.net" ? 1 : 0
 #   
 #   zone_id = local.hosted_zone_id
-#   name    = "cdn.${local.normalized_domain_name}"
-#   type    = "CNAME"
-#   ttl     = "300"
-#   records = [var.cloudfront_domain_name]
-# 
-#   # Route53レコードではタグは使用できないため削除
+#   name    = local.normalized_domain_name
+#   type    = "A"
+#   
+#   alias {
+#     name                   = var.cloudfront_domain_name
+#     zone_id                = "Z2FDTNDATAQYW2"  # CloudFrontの固定ゾーンID
+#     evaluate_target_health = false
+#   }
 # }
 
 # 追加のDNSレコード

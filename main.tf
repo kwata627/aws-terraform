@@ -266,7 +266,7 @@ module "cloudfront" {
   project               = var.project
   origin_domain_name    = module.ec2.public_dns
   acm_certificate_arn   = module.acm.certificate_arn
-  aliases               = ["cdn.${local.domain_config.domain_name}"]
+  aliases               = ["${local.domain_config.domain_name}", "cdn.${local.domain_config.domain_name}"]
   environment           = local.environment_config.name
   tags                  = local.common_tags
   
@@ -284,8 +284,8 @@ module "route53" {
   
   # ドメイン設定
   domain_name = local.domain_config.domain_name
-  wordpress_ip = module.ec2.public_ip
-  cloudfront_domain_name = ""  # 手動でCNAMEレコードを作成するため空に設定
+  wordpress_ip = ""  # CloudFront経由のため、直接EC2を指さない
+  cloudfront_domain_name = ""  # 後で手動で設定
   # certificate_validation_records = module.acm.validation_records # ACMモジュールで自動作成するため削除
   
   # ドメイン登録設定（分析結果に基づいて決定）

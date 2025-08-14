@@ -1,0 +1,13 @@
+---
+# PHPハンドラー
+- name: restart php-fpm
+  service:
+    name: php-fpm
+    state: restarted
+  become: yes
+
+- name: reload php-fpm
+  service:
+    name: php-fpm
+    state: reloaded
+  become: yes

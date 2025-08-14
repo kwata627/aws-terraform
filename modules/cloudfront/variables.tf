@@ -50,7 +50,7 @@ variable "enable_ipv6" {
 variable "default_root_object" {
   description = "デフォルトルートオブジェクト"
   type        = string
-  default     = "index.html"
+  default     = "index.php"
 }
 
 variable "origin_domain_name" {

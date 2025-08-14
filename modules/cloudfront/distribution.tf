@@ -22,6 +22,8 @@ resource "aws_cloudfront_distribution" "main" {
     origin_id   = local.origin_config.origin_id
     origin_path = local.origin_config.origin_path
 
+
+
     # カスタムオリジン設定（EC2用）
     custom_origin_config {
       http_port              = 80
