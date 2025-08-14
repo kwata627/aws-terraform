@@ -268,6 +268,7 @@ module "cloudfront" {
   acm_certificate_arn   = module.acm.certificate_arn
   aliases               = ["${local.domain_config.domain_name}", "cdn.${local.domain_config.domain_name}"]
   environment           = local.environment_config.name
+  enable_wordpress_optimization = true
   tags                  = local.common_tags
   
   depends_on = [module.acm, module.ec2]
@@ -413,6 +414,23 @@ resource "aws_route53_record" "cloudfront_cdn" {
   records = [module.cloudfront.domain_name]
 
   depends_on = [module.cloudfront, module.route53]
+}
+
+# CloudFrontキャッシュクリア（WordPress設定変更後）
+resource "null_resource" "cloudfront_cache_clear" {
+  count = var.enable_cloudfront ? 1 : 0
+  
+  triggers = {
+    wordpress_config = filemd5("${path.module}/ansible/roles/wordpress/templates/wp-config.php.j2")
+    htaccess_config = filemd5("${path.module}/ansible/roles/wordpress/templates/.htaccess.j2")
+    apache_config = filemd5("${path.module}/ansible/roles/apache/templates/wordpress.conf.j2")
+  }
+  
+  provisioner "local-exec" {
+    command = "aws cloudfront create-invalidation --distribution-id ${module.cloudfront.distribution_id} --paths '/*'"
+  }
+  
+  depends_on = [module.cloudfront]
 }
 
 # -----------------------------------------------------------------------------

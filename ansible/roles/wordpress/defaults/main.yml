@@ -1,50 +1,37 @@
 ---
-# WordPressロールのデフォルト変数
-wordpress_version: latest
-wordpress_document_root: /var/www/html
-wordpress_locale: ja
-wordpress_language: ja
+# WordPress設定のデフォルト値
 
 # データベース設定
-wordpress_db_name: "{{ lookup('env', 'WORDPRESS_DB_NAME') | default('wordpress') }}"
-wordpress_db_user: "{{ lookup('env', 'WORDPRESS_DB_USER') | default('wordpress') }}"
-wordpress_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password') }}"
-wordpress_db_host: "{{ lookup('env', 'WORDPRESS_DB_HOST') | default('localhost') }}"
-wordpress_db_charset: "{{ lookup('env', 'WORDPRESS_DB_CHARSET') | default('utf8') }}"
-wordpress_db_collate: "{{ lookup('env', 'WORDPRESS_DB_COLLATE') | default('') }}"
+wp_db_name: "wordpress"
+wp_db_user: "wordpress"
+wp_db_password: "password"
+wp_db_host: "localhost"
 
-# テーブルプレフィックス
-wordpress_table_prefix: wp_
-
-# セキュリティキー（本番環境では変更必須）
-wordpress_auth_key: 'put your unique phrase here'
-wordpress_secure_auth_key: 'put your unique phrase here'
-wordpress_logged_in_key: 'put your unique phrase here'
-wordpress_nonce_key: 'put your unique phrase here'
-wordpress_auth_salt: 'put your unique phrase here'
-wordpress_secure_auth_salt: 'put your unique phrase here'
-wordpress_logged_in_salt: 'put your unique phrase here'
-wordpress_nonce_salt: 'put your unique phrase here'
-
-# デバッグ設定
-wordpress_debug: false
-wordpress_debug_log: false
-wordpress_debug_display: false
+# WordPress設定
+wp_table_prefix: "wp_"
+wp_debug: false
+wp_lang: "ja"
 
 # セキュリティ設定
-wordpress_automatic_updater_disabled: true
-wordpress_disallow_file_edit: true
-wordpress_disallow_file_mods: true
+wp_automatic_updater_disabled: true
+wp_disallow_file_edit: true
+wp_disallow_file_mods: false
 
-# 自動設定
-wordpress_config_auto: false
+# メモリ設定
+wp_memory_limit: "256M"
+wp_max_memory_limit: "512M"
 
-# SSL設定
-wordpress_force_ssl: false
-wordpress_ssl_admin: false
+# パフォーマンス設定
+wp_post_revisions: 5
+wp_autosave_interval: 300
+wp_empty_trash_days: 30
 
-# WordPress初期セットアップ設定
-wordpress_site_title: "{{ lookup('env', 'WORDPRESS_SITE_TITLE') | default('WordPress Site') }}"
-wordpress_admin_user: "{{ lookup('env', 'WORDPRESS_ADMIN_USER') | default('admin') }}"
-wordpress_admin_password: "{{ lookup('env', 'WORDPRESS_ADMIN_PASSWORD') | default('password') }}"
-wordpress_admin_email: "{{ lookup('env', 'WORDPRESS_ADMIN_EMAIL') | default('admin@example.com') }}" 
+# 認証キー（本番環境では必ず変更してください）
+wp_auth_key: "put your unique phrase here"
+wp_secure_auth_key: "put your unique phrase here"
+wp_logged_in_key: "put your unique phrase here"
+wp_nonce_key: "put your unique phrase here"
+wp_auth_salt: "put your unique phrase here"
+wp_secure_auth_salt: "put your unique phrase here"
+wp_logged_in_salt: "put your unique phrase here"
+wp_nonce_salt: "put your unique phrase here" 

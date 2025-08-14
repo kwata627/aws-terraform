@@ -1,115 +1,162 @@
 <?php
 /**
  * WordPress基本設定ファイル
+ * 
+ * このファイルはWordPressの基本設定を含みます。
+ * データベース接続情報、認証キー、その他の設定が含まれています。
  */
 
-// ** MySQL設定 - この情報はホスティング先から入手してください ** //
-/** WordPressのためのデータベース名 */
-define( 'DB_NAME', '{{ wordpress_db_name | default('wordpress') }}' );
+// =============================================================================
+// データベース設定
+// =============================================================================
 
-/** MySQLデータベースのユーザー名 */
-define( 'DB_USER', '{{ wordpress_db_user | default('wordpress') }}' );
+/** WordPressデータベース名 */
+define( 'DB_NAME', '{{ wp_db_name | default('wordpress') }}' );
 
-/** MySQLデータベースのパスワード */
-define( 'DB_PASSWORD', '{{ wordpress_db_password | default('password') }}' );
+/** MySQLデータベースユーザー名 */
+define( 'DB_USER', '{{ wp_db_user | default('wordpress') }}' );
 
-/** MySQLのホスト名 */
-define( 'DB_HOST', '{{ rds_endpoint | default(wordpress_db_host) | default('localhost') }}' );
+/** MySQLデータベースパスワード */
+define( 'DB_PASSWORD', '{{ wp_db_password | default('password') }}' );
 
-/** データベースのテーブルを作成する際のデータベース文字セット */
-define( 'DB_CHARSET', '{{ wordpress_db_charset | default('utf8') }}' );
+/** MySQLホスト名 */
+define( 'DB_HOST', '{{ wp_db_host | default('localhost') }}' );
 
-/** データベースの照合順序 */
-define( 'DB_COLLATE', '{{ wordpress_db_collate | default('') }}' );
+/** データベース文字セット */
+define( 'DB_CHARSET', 'utf8mb4' );
+
+/** データベース照合順序 */
+define( 'DB_COLLATE', 'utf8mb4_unicode_ci' );
+
+// =============================================================================
+// 認証用ユニークキー
+// =============================================================================
 
 /**#@+
- * 認証用ユニークキー
+ * 認証用ユニークキーとソルト
+ *
+ * 後でそれぞれをユニークな（推測不可能な）文字列に変更してください。
+ * {@link https://api.wordpress.org/secret-key/1.1/salt/ WordPress.org の秘密鍵サービス} で自動生成することもできます。
+ *
+ * 後でいつでも変更して、既存のすべての cookie を無効にできます。
+ * これにより、すべてのユーザーを強制的に再ログインさせることになります。
+ *
+ * @since 2.6.0
  */
-define( 'AUTH_KEY',         '{{ wordpress_auth_key | default('put your unique phrase here') }}' );
-define( 'SECURE_AUTH_KEY',  '{{ wordpress_secure_auth_key | default('put your unique phrase here') }}' );
-define( 'LOGGED_IN_KEY',    '{{ wordpress_logged_in_key | default('put your unique phrase here') }}' );
-define( 'NONCE_KEY',        '{{ wordpress_nonce_key | default('put your unique phrase here') }}' );
-define( 'AUTH_SALT',        '{{ wordpress_auth_salt | default('put your unique phrase here') }}' );
-define( 'SECURE_AUTH_SALT', '{{ wordpress_secure_auth_salt | default('put your unique phrase here') }}' );
-define( 'LOGGED_IN_SALT',   '{{ wordpress_logged_in_salt | default('put your unique phrase here') }}' );
-define( 'NONCE_SALT',       '{{ wordpress_nonce_salt | default('put your unique phrase here') }}' );
+define( 'AUTH_KEY',         '{{ wp_auth_key | default('put your unique phrase here') }}' );
+define( 'SECURE_AUTH_KEY',  '{{ wp_secure_auth_key | default('put your unique phrase here') }}' );
+define( 'LOGGED_IN_KEY',    '{{ wp_logged_in_key | default('put your unique phrase here') }}' );
+define( 'NONCE_KEY',        '{{ wp_nonce_key | default('put your unique phrase here') }}' );
+define( 'AUTH_SALT',        '{{ wp_auth_salt | default('put your unique phrase here') }}' );
+define( 'SECURE_AUTH_SALT', '{{ wp_secure_auth_salt | default('put your unique phrase here') }}' );
+define( 'LOGGED_IN_SALT',   '{{ wp_logged_in_salt | default('put your unique phrase here') }}' );
+define( 'NONCE_SALT',       '{{ wp_nonce_salt | default('put your unique phrase here') }}' );
 
 /**#@-*/
 
-/**
- * WordPressデータベーステーブルの接頭辞
- */
-$table_prefix = '{{ wordpress_table_prefix | default('wp_') }}';
+// =============================================================================
+// WordPress設定
+// =============================================================================
 
-/**
- * 開発者へ: WordPressデバッグモード
- */
-define( 'WP_DEBUG', {{ wordpress_debug | default('false') }} );
+/** WordPress データベーステーブルの接頭辞 */
+$table_prefix = '{{ wp_table_prefix | default('wp_') }}';
 
-/**
- * デバッグログを有効にする
+/** 開発者へ: WordPress デバッグモード
+ *
+ * この値を true にすると、開発中に注意 (notice) を表示します。
+ * テーマおよびプラグインの開発者には、その開発環境においてこの WP_DEBUG を使用することを強く推奨します。
+ *
+ * その他のデバッグに利用できる定数についてはドキュメンテーションをご覧ください。
+ *
+ * @link https://ja.wordpress.org/support/article/debugging-in-wordpress/
  */
-define( 'WP_DEBUG_LOG', {{ wordpress_debug_log | default('false') }} );
+define( 'WP_DEBUG', {{ wp_debug | default(false) | lower }} );
 
-/**
- * デバッグ表示を無効にする
- */
-define( 'WP_DEBUG_DISPLAY', {{ wordpress_debug_display | default('false') }} );
+// =============================================================================
+// サイトURL設定（CloudFront対応）
+// =============================================================================
 
-/**
- * 自動更新を無効にする
- */
-define( 'AUTOMATIC_UPDATER_DISABLED', {{ wordpress_automatic_updater_disabled | default('true') }} );
+/** WordPress のホームURL */
+define( 'WP_HOME', 'https://{{ wordpress_domain | default('example.com') }}' );
 
-/**
- * ファイル編集を無効にする
- */
-define( 'DISALLOW_FILE_EDIT', {{ wordpress_disallow_file_edit | default('true') }} );
+/** WordPress のサイトURL */
+define( 'WP_SITEURL', 'https://{{ wordpress_domain | default('example.com') }}' );
 
-/**
- * ファイル修正を無効にする
- */
-define( 'DISALLOW_FILE_MODS', {{ wordpress_disallow_file_mods | default('true') }} );
+// =============================================================================
+// SSL設定
+// =============================================================================
 
-/**
- * SSL設定
- */
-{% if wordpress_force_ssl | default(false) %}
-define( 'FORCE_SSL_ADMIN', {{ wordpress_ssl_admin | default('true') }} );
+/** 管理画面を強制的にSSLでアクセス */
+define( 'FORCE_SSL_ADMIN', true );
+
+/** ログインを強制的にSSLでアクセス */
 define( 'FORCE_SSL_LOGIN', true );
-{% endif %}
 
-/**
- * WordPress URL設定（CloudFront経由でアクセス）
- */
-{% if wordpress_domain is defined and wordpress_domain | length > 0 %}
-define( 'WP_HOME', 'https://{{ wordpress_domain }}' );
-define( 'WP_SITEURL', 'https://{{ wordpress_domain }}' );
-{% elif cloudfront_domain is defined and cloudfront_domain | length > 0 %}
-define( 'WP_HOME', 'https://{{ cloudfront_domain }}' );
-define( 'WP_SITEURL', 'https://{{ cloudfront_domain }}' );
-{% elif ansible_public_ipv4 is defined and ansible_public_ipv4 | length > 0 %}
-define( 'WP_HOME', 'http://{{ ansible_public_ipv4 }}' );
-define( 'WP_SITEURL', 'http://{{ ansible_public_ipv4 }}' );
-{% elif ansible_default_ipv4 is defined %}
-define( 'WP_HOME', 'http://{{ ansible_default_ipv4.address }}' );
-define( 'WP_SITEURL', 'http://{{ ansible_default_ipv4.address }}' );
-{% else %}
-define( 'WP_HOME', 'http://localhost' );
-define( 'WP_SITEURL', 'http://localhost' );
-{% endif %}
+/** キャッシュを無効化 */
+define( 'WP_CACHE', false );
 
-/**
- * 言語設定
- */
-define( 'WPLANG', '{{ wordpress_locale | default('ja') }}' );
-
-/* 追加設定値は「さくらのマニュアル」をご利用ください。 */
-
-/** Absolute path to the WordPress directory. */
-if ( ! defined( 'ABSPATH' ) ) {
-	define( 'ABSPATH', __DIR__ . '/' );
+// =============================================================================
+// CloudFront HTTPS 検出
+// =============================================================================
+if ( isset( $_SERVER["HTTP_X_FORWARDED_PROTO"] ) && $_SERVER["HTTP_X_FORWARDED_PROTO"] === "https" ) {
+    $_SERVER["HTTPS"] = "on";
 }
 
-/** Sets up WordPress vars and included files. */
+// =============================================================================
+// 言語設定
+// =============================================================================
+
+/** 言語設定 */
+define( 'WPLANG', '{{ wp_lang | default('ja') }}' );
+
+// =============================================================================
+// 自動更新設定
+// =============================================================================
+
+/** 自動更新を無効化 */
+define( 'AUTOMATIC_UPDATER_DISABLED', {{ wp_automatic_updater_disabled | default(true) | lower }} );
+
+/** ファイル編集を無効化 */
+define( 'DISALLOW_FILE_EDIT', {{ wp_disallow_file_edit | default(true) | lower }} );
+
+/** ファイル修正を無効化 */
+define( 'DISALLOW_FILE_MODS', {{ wp_disallow_file_mods | default(false) | lower }} );
+
+// =============================================================================
+// メモリ制限
+// =============================================================================
+
+/** WordPress のメモリ制限 */
+define( 'WP_MEMORY_LIMIT', '{{ wp_memory_limit | default('256M') }}' );
+
+/** 管理画面のメモリ制限 */
+define( 'WP_MAX_MEMORY_LIMIT', '{{ wp_max_memory_limit | default('512M') }}' );
+
+// =============================================================================
+// その他の設定
+// =============================================================================
+
+/** リビジョン数を制限 */
+define( 'WP_POST_REVISIONS', {{ wp_post_revisions | default(5) }} );
+
+/** 自動保存の間隔（秒） */
+define( 'AUTOSAVE_INTERVAL', {{ wp_autosave_interval | default(300) }} );
+
+/** ゴミ箱の空にするまでの日数 */
+define( 'EMPTY_TRASH_DAYS', {{ wp_empty_trash_days | default(30) }} );
+
+// =============================================================================
+// 絶対パス
+// =============================================================================
+
+/** WordPress ディレクトリへの絶対パス */
+if ( ! defined( 'ABSPATH' ) ) {
+    define( 'ABSPATH', __DIR__ . '/' );
+}
+
+// =============================================================================
+// WordPress の読み込み
+// =============================================================================
+
+/** WordPress の設定とテンプレートファイルを読み込む */
 require_once ABSPATH . 'wp-settings.php'; 

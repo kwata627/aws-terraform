@@ -4,14 +4,28 @@
   hosts: wordpress
   become: yes
   vars:
-    wordpress_db_host: "{{ lookup('env', 'WORDPRESS_DB_HOST') | default('localhost') }}"
-    wordpress_db_name: wordpress
-    wordpress_db_user: admin
-    wordpress_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password') }}"
-    wordpress_config_auto: true
+    # データベース設定
+    wp_db_host: "{{ lookup('env', 'WORDPRESS_DB_HOST') | default('localhost') }}"
+    wp_db_name: wordpress
+    wp_db_user: wordpress
+    wp_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password') }}"
+    
+    # WordPress設定
     wordpress_domain: "{{ lookup('env', 'WORDPRESS_DOMAIN') | default('example.com') }}"
+    
+    # SSH設定
     ssh_private_key: "{{ lookup('file', '/tmp/terraform_ssh_key') }}"
     ssh_public_key: "{{ lookup('file', '/tmp/terraform_ssh_key.pub') | default('') }}"
+    
+    # PHP-FPM設定
+    php_fpm_enabled: true
+    
+    # Apache設定
+    apache_enable_ssl: false  # CloudFrontがHTTPSを処理
+    
+    # セキュリティ設定
+    security_enable_firewall: true
+    security_enable_selinux: true
   
   roles:
     - system
