@@ -29,6 +29,8 @@ resource "aws_cloudfront_distribution" "main" {
       origin_protocol_policy = "http-only"
       origin_ssl_protocols   = ["TLSv1.2"]
     }
+
+
   }
 
   # デフォルトキャッシュビヘイビアの設定
@@ -61,7 +63,7 @@ resource "aws_cloudfront_distribution" "main" {
     # ForwardedValuesの設定（EC2オリジン用）
     forwarded_values {
       query_string = true
-      headers      = ["Host", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"]
+      headers      = ["Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"]
       cookies {
         forward = "all"
       }
