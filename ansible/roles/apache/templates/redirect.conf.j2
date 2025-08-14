@@ -1,0 +1,17 @@
+# HTTPからHTTPSへのリダイレクト設定
+# ACMEチャレンジ用の.well-knownディレクトリは除外
+
+# リライトエンジンを有効化
+RewriteEngine On
+
+# ACMEチャレンジ用の.well-knownディレクトリはリダイレクトしない
+RewriteCond %{REQUEST_URI} !^/.well-known/acme-challenge/
+
+# HTTPからHTTPSへのリダイレクト
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# セキュリティヘッダー
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options DENY
+Header always set X-XSS-Protection "1; mode=block"

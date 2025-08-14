@@ -14,6 +14,26 @@ AWS上にTerraformを用いてWordPressブログ環境をIaCとして構築し�
 - **ロールバック機能** - 問題発生時の迅速な復旧
 - **検証環境管理** - コスト最適化された検証環境
 - **SSH許可IP更新** - セキュリティの自動化
+- **Let's Encrypt SSL証明書** - 自動SSL/TLS証明書管理
+
+### 🔒 SSL/TLS証明書管理
+このプロジェクトでは、**Let's Encrypt**を使用した自動SSL証明書管理を実装しています：
+
+- **自動証明書取得**: ドメイン検証による自動証明書発行
+- **自動更新**: 90日間の有効期限を自動管理
+- **セキュア設定**: 最新のSSL/TLS設定とセキュリティヘッダー
+- **ACMEチャレンジ**: HTTP-01チャレンジによるドメイン検証
+
+**設定例**:
+```hcl
+# Let's Encrypt設定
+enable_lets_encrypt = true
+lets_encrypt_email = "your-email@example.com"
+lets_encrypt_staging = false  # 本番環境ではfalse
+
+# SSL設定
+enable_ssl_setup = true
+```
 
 ### 📋 ドキュメント
 詳細な使用方法については、[docs/](./docs/)ディレクトリを参照してください：
@@ -39,6 +59,38 @@ cp terraform.tfvars.example terraform.tfvars
 cp deployment_config.example.json deployment_config.json
 # deployment_config.jsonを編集して適切な値を設定
 ```
+
+#### SSH鍵の設定
+このプロジェクトでは、SSH鍵を`~/.ssh/`ディレクトリに配置することを想定しています：
+
+```bash
+# SSH鍵の配置例
+~/.ssh/ssh_key          # 秘密鍵
+~/.ssh/ssh_key.pub      # 公開鍵
+
+# 環境変数でSSH鍵のパスを指定することも可能
+export SSH_PRIVATE_KEY_FILE="~/.ssh/my-custom-key"
+export SSH_PUBLIC_KEY_PATH="~/.ssh/my-custom-key.pub"
+```
+
+**注意**: SSH鍵は自動的に生成され、`~/.ssh/`ディレクトリに配置されます。既存の鍵を使用する場合は、環境変数でパスを指定してください。
+
+#### データベースパスワードの設定
+このプロジェクトでは、RDSとWordPressで同じパスワードを使用します：
+
+```bash
+# terraform.tfvarsでの設定例
+db_password = "your-secure-password-here"
+
+# 環境変数での設定例
+export WORDPRESS_DB_PASSWORD="your-secure-password-here"
+export WORDPRESS_DB_HOST="your-rds-endpoint:3306"
+```
+
+**注意**: 
+- パスワードは8-128文字で設定してください
+- 本番環境では強力なパスワードを使用してください
+- パスワードは自動的にRDSとWordPressの両方に設定されます
 
 #### 自動リソース名生成機能
 プロジェクト名（`var.project`）を設定すると、以下のリソース名が自動的に生成されます：

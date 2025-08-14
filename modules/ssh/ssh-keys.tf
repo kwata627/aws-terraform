@@ -183,10 +183,10 @@ resource "null_resource" "ssh_key_files" {
   }
   
   provisioner "local-exec" {
-    command = "echo '${tls_private_key.ssh.private_key_pem}' > /tmp/${aws_key_pair.ssh.key_name}.pem && chmod 600 /tmp/${aws_key_pair.ssh.key_name}.pem"
+    command = "mkdir -p ~/.ssh && echo '${tls_private_key.ssh.private_key_pem}' > ~/.ssh/${aws_key_pair.ssh.key_name} && chmod 600 ~/.ssh/${aws_key_pair.ssh.key_name}"
   }
   
   provisioner "local-exec" {
-    command = "echo '${tls_private_key.ssh.public_key_openssh}' > /tmp/${aws_key_pair.ssh.key_name}.pub && chmod 644 /tmp/${aws_key_pair.ssh.key_name}.pub"
+    command = "echo '${tls_private_key.ssh.public_key_openssh}' > ~/.ssh/${aws_key_pair.ssh.key_name}.pub && chmod 644 ~/.ssh/${aws_key_pair.ssh.key_name}.pub"
   }
 } 

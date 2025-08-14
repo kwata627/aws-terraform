@@ -109,3 +109,11 @@ tags = {
   Backup      = "enabled"
   Monitoring  = "enabled"
 } 
+
+# Let's Encrypt設定
+enable_lets_encrypt = true
+lets_encrypt_email = "your-email@example.com"
+lets_encrypt_staging = false  # 本番環境ではfalseに設定
+
+# SSL設定
+enable_ssl_setup = true 

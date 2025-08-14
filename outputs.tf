@@ -133,6 +133,8 @@ resource "null_resource" "wordpress_setup" {
       # 環境変数の設定
       export WORDPRESS_DB_HOST="${module.rds.db_endpoint}"
       export WORDPRESS_DB_PASSWORD="${var.db_password}"
+      export SSH_PRIVATE_KEY_FILE="${module.ssh.private_key_path}"
+      export SSH_PUBLIC_KEY_PATH="${module.ssh.public_key_path}"
       
       # Ansibleディレクトリに移動
       cd ansible
@@ -176,15 +178,18 @@ resource "null_resource" "wordpress_setup" {
 }
 
 # -----------------------------------------------------------------------------
-# SSL Setup Resource
+# SSL/TLS Setup Resource (Let's Encrypt対応)
 # -----------------------------------------------------------------------------
 
 resource "null_resource" "ssl_setup" {
-  count = var.enable_ssl_setup ? 1 : 0
+  count = var.enable_ssl_setup && var.enable_lets_encrypt ? 1 : 0
   
   triggers = {
     domain_name = var.domain_name
-    acm_certificate_arn = module.acm.certificate_arn
+    lets_encrypt_email = var.lets_encrypt_email
+    lets_encrypt_staging = var.lets_encrypt_staging
+    webroot_path = "/var/www/html"
+    apache_config_version = "2.0"
   }
 
   provisioner "local-exec" {
@@ -192,29 +197,22 @@ resource "null_resource" "ssl_setup" {
       # Ansibleディレクトリに移動
       cd ansible
       
-      # ACM証明書の状態を確認
-      echo "ACM証明書の状態を確認中..."
-      CERT_STATUS=$(aws acm describe-certificate \
-        --certificate-arn "${module.acm.certificate_arn}" \
-        --region us-east-1 \
-        --query 'Certificate.Status' \
-        --output text 2>/dev/null || echo "UNKNOWN")
+      # Let's Encrypt証明書の設定
+      echo "Let's Encrypt証明書の設定を開始中..."
       
-      echo "証明書の状態: $CERT_STATUS"
+      # 環境変数を設定
+      export DOMAIN_NAME="${var.domain_name}"
+      export LETS_ENCRYPT_EMAIL="${var.lets_encrypt_email}"
+      export LETS_ENCRYPT_STAGING="${var.lets_encrypt_staging}"
+      export SSH_PRIVATE_KEY_FILE="${module.ssh.private_key_path}"
+      export SSH_PUBLIC_KEY_PATH="${module.ssh.public_key_path}"
       
-      # 証明書が発行済みの場合のみSSL設定を実行
-      if [ "$CERT_STATUS" = "ISSUED" ]; then
-        echo "SSL証明書の設定を開始中..."
-        if ansible-playbook -i inventory/hosts.yml playbooks/ssl_setup.yml; then
-          echo "✓ SSL証明書の設定が完了しました"
-        else
-          echo "✗ SSL証明書の設定に失敗しました"
-          exit 1
-        fi
+      # Let's Encrypt証明書の取得と設定
+      if ansible-playbook -i inventory/hosts.yml playbooks/lets_encrypt_setup.yml; then
+        echo "✓ Let's Encrypt証明書の設定が完了しました"
       else
-        echo "証明書がまだ発行されていません。状態: $CERT_STATUS"
-        echo "証明書の発行を待機中..."
-        exit 0
+        echo "✗ Let's Encrypt証明書の設定に失敗しました"
+        exit 1
       fi
       
       # 元のディレクトリに戻る
@@ -222,7 +220,7 @@ resource "null_resource" "ssl_setup" {
     EOT
   }
 
-  depends_on = [module.acm, null_resource.wordpress_setup]
+  depends_on = [null_resource.wordpress_setup]
 }
 
 # -----------------------------------------------------------------------------
@@ -385,23 +383,23 @@ output "s3_bucket_domain_name" {
 }
 
 # -----------------------------------------------------------------------------
-# ACM Information
+# ACM Information (無効化)
 # -----------------------------------------------------------------------------
 
-output "acm_certificate_arn" {
-  description = "ACM証明書のARN"
-  value       = try(module.acm.certificate_arn, null)
-}
+# output "acm_certificate_arn" {
+#   description = "ACM証明書のARN"
+#   value       = try(module.acm.certificate_arn, null)
+# }
 
-output "acm_certificate_status" {
-  description = "ACM証明書のステータス"
-  value       = try(module.acm.certificate_status, null)
-}
+# output "acm_certificate_status" {
+#   description = "ACM証明書のステータス"
+#   value       = try(module.acm.certificate_status, null)
+# }
 
-output "acm_validation_records" {
-  description = "ACM証明書の検証レコード"
-  value       = try(module.acm.validation_records, null)
-}
+# output "acm_validation_records" {
+#   description = "ACM証明書の検証レコード"
+#   value       = try(module.acm.validation_records, null)
+# }
 
 # -----------------------------------------------------------------------------
 # Route53 Information
@@ -486,28 +484,28 @@ output "validation_rds_endpoint" {
 }
 
 # -----------------------------------------------------------------------------
-# CloudFront Information (When Enabled)
+# CloudFront Information (無効化)
 # -----------------------------------------------------------------------------
 
-output "cloudfront_distribution_id" {
-  description = "CloudFrontディストリビューションのID"
-  value       = try(module.cloudfront.distribution_id, null)
-}
+# output "cloudfront_distribution_id" {
+#   description = "CloudFrontディストリビューションのID"
+#   value       = try(module.cloudfront.distribution_id, null)
+# }
 
-output "cloudfront_domain_name" {
-  description = "CloudFrontディストリビューションのドメイン名"
-  value       = try(module.cloudfront.domain_name, null)
-}
+# output "cloudfront_domain_name" {
+#   description = "CloudFrontディストリビューションのドメイン名"
+#   value       = try(module.cloudfront.domain_name, null)
+# }
 
-output "cloudfront_distribution_arn" {
-  description = "CloudFrontディストリビューションのARN"
-  value       = try(module.cloudfront.distribution_arn, null)
-}
+# output "cloudfront_distribution_arn" {
+#   description = "CloudFrontディストリビューションのARN"
+#   value       = try(module.cloudfront.distribution_arn, null)
+# }
 
-output "cloudfront_distribution_status" {
-  description = "CloudFrontディストリビューションのステータス"
-  value       = try(module.cloudfront.distribution_status, null)
-}
+# output "cloudfront_distribution_status" {
+#   description = "CloudFrontディストリビューションのステータス"
+#   value       = try(module.cloudfront.distribution_status, null)
+# }
 
 # -----------------------------------------------------------------------------
 # Module Status Information
@@ -519,13 +517,13 @@ output "module_status" {
     ssh_enabled = true
     nat_instance_enabled = true
     network_enabled = true
-    security_enabled = true
+    security_enabled = local.enable_security
     ec2_enabled = true
     rds_enabled = true
     s3_enabled = true
-    acm_enabled = true
-    cloudfront_enabled = true
     route53_enabled = true
+    cloudfront_enabled = false  # CloudFrontを無効化
+    acm_enabled = false  # ACMを無効化
   }
 }
 

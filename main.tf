@@ -39,6 +39,7 @@ module "ssh" {
   source  = "./modules/ssh"
   project = var.project
   environment = local.environment_config.name
+  key_name_suffix = var.ssh_key_name_suffix
   tags = local.common_tags
 }
 
@@ -109,8 +110,8 @@ module "security" {
   # セキュリティルール設定
   security_rules = local.security_rules
   
-  # CloudFront設定
-  enable_cloudfront_access = true
+  # CloudFront設定（無効化）
+  enable_cloudfront_access = false
   
   # セキュリティ機能設定
   enable_security_audit = local.security_features.enable_security_audit
@@ -135,7 +136,7 @@ module "ec2" {
   subnet_id         = module.network.public_subnet_ids[0]
   private_subnet_id = module.network.private_subnet_ids[0]
   security_group_id = local.enable_security ? module.security[0].ec2_public_sg_id : null
-  security_group_ids = local.enable_security ? module.security[0].cloudfront_access_sg_ids : []
+  security_group_ids = []  # CloudFrontアクセスセキュリティグループを削除
   validation_security_group_id = local.enable_security ? module.security[0].ec2_private_sg_id : null
   key_name          = module.ssh.key_name
   ssh_public_key    = module.ssh.public_key_openssh
@@ -230,49 +231,49 @@ module "s3" {
   # インテリジェントティアリング
   enable_intelligent_tiering = local.s3_features.enable_intelligent_tiering
   
-  # CloudFront統合
-  # cloudfront_distribution_arn = module.cloudfront.distribution_arn # 一時的に無効化
+  # CloudFront統合（削除）
+  # cloudfront_distribution_arn = module.cloudfront.distribution_arn
   
   # タグ設定
   tags = local.common_tags
 }
 
 # -----------------------------------------------------------------------------
-# ACM Module
+# ACM Module (無効化)
 # -----------------------------------------------------------------------------
 
-module "acm" {
-  source      = "./modules/acm"
-  project     = var.project
-  domain_name = local.domain_config.domain_name
-  environment = local.environment_config.name
-  
-  # Route53ゾーンID（DNS検証用レコードの作成に必要）
-  route53_zone_id = module.route53.zone_id
-  
-  providers = {
-    aws = aws.us_east_1
-  }
-  
-  depends_on = [module.route53]
-}
+# module "acm" {
+#   source      = "./modules/acm"
+#   project     = var.project
+#   domain_name = local.domain_config.domain_name
+#   environment = local.environment_config.name
+#   
+#   # Route53ゾーンID（DNS検証用レコードの作成に必要）
+#   route53_zone_id = module.route53.zone_id
+#   
+#   providers = {
+#     aws = aws.us_east_1
+#   }
+#   
+#   depends_on = [module.route53]
+# }
 
 # -----------------------------------------------------------------------------
-# CloudFront Module
+# CloudFront Module (無効化)
 # -----------------------------------------------------------------------------
 
-module "cloudfront" {
-  source                = "./modules/cloudfront"
-  project               = var.project
-  origin_domain_name    = module.ec2.public_dns
-  acm_certificate_arn   = module.acm.certificate_arn
-  aliases               = ["${local.domain_config.domain_name}", "cdn.${local.domain_config.domain_name}"]
-  environment           = local.environment_config.name
-  enable_wordpress_optimization = true
-  tags                  = local.common_tags
-  
-  depends_on = [module.acm, module.ec2]
-}
+# module "cloudfront" {
+#   source                = "./modules/cloudfront"
+#   project               = var.project
+#   origin_domain_name    = module.ec2.public_dns
+#   acm_certificate_arn   = module.acm.certificate_arn
+#   aliases               = ["${local.domain_config.domain_name}", "cdn.${local.domain_config.domain_name}"]
+#   environment           = local.environment_config.name
+#   enable_wordpress_optimization = true
+#   tags                  = local.common_tags
+#   
+#   depends_on = [module.acm, module.ec2]
+# }
 
 # -----------------------------------------------------------------------------
 # Route53 Module
@@ -285,9 +286,8 @@ module "route53" {
   
   # ドメイン設定
   domain_name = local.domain_config.domain_name
-  wordpress_ip = ""  # CloudFront経由のため、直接EC2を指さない
-  cloudfront_domain_name = ""  # 後で手動で設定
-  # certificate_validation_records = module.acm.validation_records # ACMモジュールで自動作成するため削除
+  wordpress_ip = module.ec2.public_ip  # 直接EC2を指す
+  cloudfront_domain_name = ""  # CloudFrontを無効化
   
   # ドメイン登録設定（分析結果に基づいて決定）
   register_domain = local.should_register_domain
@@ -386,27 +386,30 @@ module "route53" {
 #   depends_on = [module.cloudfront]
 # }
 
-# Route53レコードの自動管理（CloudFrontディストリビューション作成後）
-resource "aws_route53_record" "cloudfront_main" {
-  count = var.enable_cloudfront ? 1 : 0
-  
+# Route53レコードの自動管理（直接EC2アクセス）
+resource "aws_route53_record" "wordpress_main" {
   zone_id = module.route53.zone_id
   name    = local.domain_config.domain_name
   type    = "A"
+  ttl     = 300
+  records = [module.ec2.public_ip]
 
-  alias {
-    name                   = module.cloudfront.domain_name
-    zone_id                = "Z2FDTNDATAQYW2"  # CloudFrontの固定ゾーンID
-    evaluate_target_health = false
-  }
-
-  depends_on = [module.cloudfront, module.route53]
+  depends_on = [module.ec2, module.route53]
 }
 
-# 管理画面用の直接アクセスレコード（CloudFront経由ではない）
+# wwwサブドメインのRoute53レコード
+resource "aws_route53_record" "wordpress_www" {
+  zone_id = module.route53.zone_id
+  name    = "www.${local.domain_config.domain_name}"
+  type    = "A"
+  ttl     = 300
+  records = [module.ec2.public_ip]
+
+  depends_on = [module.ec2, module.route53]
+}
+
+# 管理画面用の直接アクセスレコード
 resource "aws_route53_record" "wordpress_direct" {
-  count = var.enable_cloudfront ? 1 : 0
-  
   zone_id = module.route53.zone_id
   name    = "admin.${local.domain_config.domain_name}"
   type    = "A"
@@ -416,35 +419,36 @@ resource "aws_route53_record" "wordpress_direct" {
   depends_on = [module.ec2, module.route53]
 }
 
-resource "aws_route53_record" "cloudfront_cdn" {
-  count = var.enable_cloudfront ? 1 : 0
-  
-  zone_id = module.route53.zone_id
-  name    = "cdn.${local.domain_config.domain_name}"
-  type    = "CNAME"
-  ttl     = 300
+# CloudFront関連レコードを削除
+# resource "aws_route53_record" "cloudfront_cdn" {
+#   count = var.enable_cloudfront ? 1 : 0
+#   
+#   zone_id = module.route53.zone_id
+#   name    = "cdn.${local.domain_config.domain_name}"
+#   type    = "CNAME"
+#   ttl     = 300
+# 
+#   records = [module.cloudfront.domain_name]
+# 
+#   depends_on = [module.cloudfront, module.route53]
+# }
 
-  records = [module.cloudfront.domain_name]
-
-  depends_on = [module.cloudfront, module.route53]
-}
-
-# CloudFrontキャッシュクリア（WordPress設定変更後）
-resource "null_resource" "cloudfront_cache_clear" {
-  count = var.enable_cloudfront ? 1 : 0
-  
-  triggers = {
-    wordpress_config = filemd5("${path.module}/ansible/roles/wordpress/templates/wp-config.php.j2")
-    htaccess_config = filemd5("${path.module}/ansible/roles/wordpress/templates/.htaccess.j2")
-    apache_config = filemd5("${path.module}/ansible/roles/apache/templates/wordpress.conf.j2")
-  }
-  
-  provisioner "local-exec" {
-    command = "aws cloudfront create-invalidation --distribution-id ${module.cloudfront.distribution_id} --paths '/*'"
-  }
-  
-  depends_on = [module.cloudfront]
-}
+# CloudFrontキャッシュクリアを削除
+# resource "null_resource" "cloudfront_cache_clear" {
+#   count = var.enable_cloudfront ? 1 : 0
+#   
+#   triggers = {
+#     wordpress_config = filemd5("${path.module}/ansible/roles/wordpress/templates/wp-config.php.j2")
+#     htaccess_config = filemd5("${path.module}/ansible/roles/wordpress/templates/.htaccess.j2")
+#     apache_config = filemd5("${path.module}/ansible/roles/apache/templates/wordpress.conf.j2")
+#   }
+#   
+#   provisioner "local-exec" {
+#     command = "aws cloudfront create-invalidation --distribution-id ${module.cloudfront.distribution_id} --paths '/*'"
+#   }
+#   
+#   depends_on = [module.cloudfront]
+# }
 
 # Ansible実行（WordPress設定適用）
 resource "null_resource" "ansible_wordpress_setup" {

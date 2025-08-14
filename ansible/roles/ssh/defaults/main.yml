@@ -2,12 +2,12 @@
 # SSHロールのデフォルト変数
 
 # SSH鍵設定
-ssh_private_key: "{{ lookup('env', 'SSH_PRIVATE_KEY_PATH') | default('/tmp/ssh_key.pem') }}"
-ssh_public_key: "{{ lookup('env', 'SSH_PUBLIC_KEY_PATH') | default('/tmp/ssh_key.pub') }}"
+ssh_private_key: "{{ lookup('env', 'SSH_PRIVATE_KEY_PATH') | default('~/.ssh/ssh_key') }}"
+ssh_public_key: "{{ lookup('env', 'SSH_PUBLIC_KEY_PATH') | default('~/.ssh/ssh_key.pub') }}"
 
 # SSH鍵ファイルパス設定
-ssh_key_file_path: "{{ lookup('env', 'SSH_KEY_FILE_PATH') | default('/tmp/ssh_key.pem') }}"
-ssh_public_key_file_path: "{{ lookup('env', 'SSH_PUBLIC_KEY_FILE_PATH') | default('/tmp/ssh_key.pub') }}"
+ssh_key_file_path: "{{ lookup('env', 'SSH_KEY_FILE_PATH') | default('~/.ssh/ssh_key') }}"
+ssh_public_key_file_path: "{{ lookup('env', 'SSH_PUBLIC_KEY_FILE_PATH') | default('~/.ssh/ssh_key.pub') }}"
 
 # SSH鍵生成設定
 ssh_generate_public_key: "{{ lookup('env', 'SSH_GENERATE_PUBLIC_KEY') | default(false) }}"

@@ -52,12 +52,12 @@ output "public_key_pem" {
 
 output "private_key_path" {
   description = "秘密鍵のファイルパス（Ansible用）"
-  value       = "/tmp/${aws_key_pair.ssh.key_name}.pem"
+  value       = "~/.ssh/${aws_key_pair.ssh.key_name}"
 }
 
 output "public_key_path" {
   description = "公開鍵のファイルパス（Ansible用）"
-  value       = "/tmp/${aws_key_pair.ssh.key_name}.pub"
+  value       = "~/.ssh/${aws_key_pair.ssh.key_name}.pub"
 }
 
 # -----------------------------------------------------------------------------

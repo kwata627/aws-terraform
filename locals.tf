@@ -7,8 +7,8 @@
 # =============================================================================
 
 locals {
-  # CloudFront IPアドレスリストの読み込み
-  cloudfront_ips = split("\n", trimspace(file("${path.module}/cloudfront_ips_latest.txt")))
+  # CloudFront IPアドレスリストの読み込みを削除（CloudFront機能を無効化）
+  # cloudfront_ips = split("\n", trimspace(file("${path.module}/cloudfront_ips_latest.txt")))
   
   # 共通タグ
   common_tags = merge(

@@ -41,13 +41,13 @@ output "cache_sg_id" {
 }
 
 output "cloudfront_access_sg_ids" {
-  description = "CloudFrontアクセス用セキュリティグループのIDリスト"
-  value       = var.enable_cloudfront_access ? [aws_security_group.cloudfront_access[0].id] : []
+  description = "CloudFrontアクセス用セキュリティグループのIDリスト（無効化）"
+  value       = []  # CloudFront機能を無効化
 }
 
 output "cloudfront_access_sg_id" {
-  description = "CloudFrontアクセス用セキュリティグループのID"
-  value       = var.enable_cloudfront_access ? aws_security_group.cloudfront_access[0].id : null
+  description = "CloudFrontアクセス用セキュリティグループのID（無効化）"
+  value       = null  # CloudFront機能を無効化
 }
 
 # -----------------------------------------------------------------------------

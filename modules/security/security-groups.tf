@@ -290,53 +290,55 @@ resource "aws_security_group" "cache" {
 }
 
 # -----------------------------------------------------------------------------
-# CloudFront Access Security Groups (Split for rule limit)
+# CloudFront Access Security Groups (無効化)
 # -----------------------------------------------------------------------------
 
-locals {
-  cloudfront_ip_ranges_japan = split("\n", trimspace(file("${path.module}/../../cloudfront_ips_japan_only.txt")))
-}
+# CloudFront IPアドレスリストの読み込みを削除
+# locals {
+#   cloudfront_ip_ranges_japan = split("\n", trimspace(file("${path.module}/../../cloudfront_ips_japan_only.txt")))
+# }
 
-resource "aws_security_group" "cloudfront_access" {
-  count = var.enable_cloudfront_access ? 1 : 0
-
-  name        = "${var.project}-sg-cloudfront-access"
-  description = "Security group for CloudFront access to EC2 (Japan only)"
-  vpc_id      = var.vpc_id
-
-  # CloudFrontからのHTTPアクセス
-  ingress {
-    description = "HTTP from CloudFront"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = local.cloudfront_ip_ranges_japan
-  }
-
-  # CloudFrontからのHTTPSアクセス
-  ingress {
-    description = "HTTPS from CloudFront"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = local.cloudfront_ip_ranges_japan
-  }
-
-  # すべてのアウトバウンドトラフィック
-  egress {
-    description = "All outbound traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(
-    local.common_tags,
-    {
-      Name = "${var.project}-sg-cloudfront-access"
-      Purpose = "cloudfront-access"
-      SecurityLevel = "high"
-    }
-  )
-}
+# CloudFrontアクセスセキュリティグループを無効化
+# resource "aws_security_group" "cloudfront_access" {
+#   count = var.enable_cloudfront_access ? 1 : 0
+# 
+#   name        = "${var.project}-sg-cloudfront-access"
+#   description = "Security group for CloudFront access to EC2 (Japan only)"
+#   vpc_id      = var.vpc_id
+# 
+#   # CloudFrontからのHTTPアクセス
+#   ingress {
+#     description = "HTTP from CloudFront"
+#     from_port   = 80
+#     to_port     = 80
+#     protocol    = "tcp"
+#     cidr_blocks = local.cloudfront_ip_ranges_japan
+#   }
+# 
+#   # CloudFrontからのHTTPSアクセス
+#   ingress {
+#     description = "HTTPS from CloudFront"
+#     from_port   = 443
+#     to_port     = 443
+#     protocol    = "tcp"
+#     cidr_blocks = local.cloudfront_ip_ranges_japan
+#   }
+# 
+#   # すべてのアウトバウンドトラフィック
+#   egress {
+#     description = "All outbound traffic"
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = "-1"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+# 
+#   tags = merge(
+#     local.common_tags,
+#     {
+#       Name = "${var.project}-sg-cloudfront-access"
+#       Purpose = "cloudfront-access"
+#       SecurityLevel = "high"
+#     }
+#   )
+# }

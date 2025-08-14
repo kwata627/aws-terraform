@@ -59,6 +59,21 @@ variable "environment" {
 }
 
 # -----------------------------------------------------------------------------
+# SSH Configuration
+# -----------------------------------------------------------------------------
+
+variable "ssh_key_name_suffix" {
+  description = "SSHキーペア名のサフィックス"
+  type        = string
+  default     = "ssh-key"
+  
+  validation {
+    condition     = can(regex("^[a-z0-9-]+$", var.ssh_key_name_suffix)) && length(var.ssh_key_name_suffix) >= 1 && length(var.ssh_key_name_suffix) <= 20
+    error_message = "SSHキー名サフィックスは1-20文字の小文字、数字、ハイフンのみ使用可能です。"
+  }
+}
+
+# -----------------------------------------------------------------------------
 # Network Configuration
 # -----------------------------------------------------------------------------
 
@@ -360,7 +375,7 @@ variable "tags" {
 variable "enable_cloudfront" {
   description = "CloudFrontディストリビューションの有効化"
   type        = bool
-  default     = true
+  default     = false  # CloudFront機能を無効化
 }
 
 # -----------------------------------------------------------------------------
@@ -371,6 +386,43 @@ variable "auto_update_nameservers" {
   description = "ドメインのネームサーバーを自動更新するかどうか"
   type        = bool
   default     = true
+}
+
+# -----------------------------------------------------------------------------
+# SSL/TLS Configuration (Let's Encrypt)
+# -----------------------------------------------------------------------------
+
+variable "enable_lets_encrypt" {
+  description = "Let's Encrypt証明書の自動取得を有効にするかどうか"
+  type        = bool
+  default     = true
+  
+  validation {
+    condition     = contains([true, false], var.enable_lets_encrypt)
+    error_message = "enable_lets_encryptは true または false である必要があります。"
+  }
+}
+
+variable "lets_encrypt_email" {
+  description = "Let's Encrypt証明書の通知用メールアドレス"
+  type        = string
+  default     = "admin@example.com"
+  
+  validation {
+    condition     = can(regex("^[^@]+@[^@]+\\.[^@]+$", var.lets_encrypt_email))
+    error_message = "有効なメールアドレスを指定してください。"
+  }
+}
+
+variable "lets_encrypt_staging" {
+  description = "Let's Encryptステージング環境を使用するかどうか（テスト用）"
+  type        = bool
+  default     = false
+  
+  validation {
+    condition     = contains([true, false], var.lets_encrypt_staging)
+    error_message = "lets_encrypt_stagingは true または false である必要があります。"
+  }
 }
 
 

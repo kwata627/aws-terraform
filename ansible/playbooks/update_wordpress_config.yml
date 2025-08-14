@@ -4,6 +4,9 @@
   hosts: wordpress
   become: yes
   
+  vars:
+    db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('your-secure-password-here') }}"
+  
   tasks:
     - name: Update WordPress URLs in wp-config.php
       replace:
@@ -25,7 +28,7 @@
         login_host: "{{ rds_endpoint | regex_replace(':.*', '') }}"
         login_port: "{{ rds_endpoint | regex_replace('.*:', '') | default('3306') }}"
         login_user: admin
-        login_password: breadhouse
+        login_password: "{{ db_password }}"
         query: "UPDATE wp_options SET option_value = 'https://{{ wordpress_domain | default(cloudfront_domain | default('example.com')) }}' WHERE option_name IN ('home', 'siteurl');"
       ignore_errors: yes
 

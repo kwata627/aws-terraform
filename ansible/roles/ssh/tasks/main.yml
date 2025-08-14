@@ -12,16 +12,15 @@
     state: directory
     mode: '0755'
 
-- name: Save SSH private key
-  copy:
-    content: "{{ ssh_private_key }}"
-    dest: "{{ ssh_key_file_path | default('/tmp/ssh_key.pem') }}"
-    mode: '0600'
-    owner: root
-    group: root
-  when: ssh_private_key is defined
-
-
+# SSH鍵の保存は無効化（ローカルに既に存在するため）
+# - name: Save SSH private key
+#   copy:
+#     content: "{{ ssh_private_key }}"
+#     dest: "{{ ssh_key_file_path | default('~/.ssh/ssh_key') }}"
+#     mode: '0600'
+#     owner: root
+#     group: root
+#   when: ssh_private_key is defined
 
 - name: Create .ssh directory for {{ ssh_user }}
   file:
@@ -31,12 +30,18 @@
     owner: "{{ ssh_user }}"
     group: "{{ ssh_user }}"
 
+- name: Check if SSH public key file exists
+  stat:
+    path: "{{ ssh_public_key }}"
+  register: ssh_public_key_file
+
 - name: Set authorized_keys for {{ ssh_user }}
   authorized_key:
     user: "{{ ssh_user }}"
     state: present
     key: "{{ lookup('file', ssh_public_key) }}"
     manage_dir: no
+  when: ssh_public_key_file.stat.exists
 
 - name: Ensure correct permissions on authorized_keys
   file:
@@ -44,6 +49,7 @@
     mode: '0600'
     owner: "{{ ssh_user }}"
     group: "{{ ssh_user }}"
+  when: ssh_public_key_file.stat.exists
 
 - name: Configure SSH daemon settings
   lineinfile:

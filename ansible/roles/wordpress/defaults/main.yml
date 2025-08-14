@@ -4,8 +4,8 @@
 # データベース設定
 wp_db_name: "wordpress"
 wp_db_user: "admin"
-wp_db_password: "password"
-wp_db_host: "localhost"
+wp_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('your-secure-password-here') }}"
+wp_db_host: "{{ lookup('env', 'WORDPRESS_DB_HOST') | default('localhost') }}"
 
 # WordPress設定
 wp_table_prefix: "wp_"

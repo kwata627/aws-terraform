@@ -132,7 +132,7 @@ def generate_inventory(terraform_output: Dict[str, Any]) -> Dict[str, Any]:
             inventory['all']['children']['wordpress']['hosts']['wordpress_ec2'] = {
                 'ansible_host': wordpress_ip,
                 'ansible_user': os.getenv('SSH_USER', 'ec2-user'),
-                'ansible_ssh_private_key_file': os.getenv('SSH_PRIVATE_KEY_FILE', '~/.ssh/wordpress_key'),
+                'ansible_ssh_private_key_file': os.getenv('SSH_PRIVATE_KEY_FILE', '~/.ssh/ssh_key'),
                 'ansible_ssh_common_args': '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null',
                 'ansible_ssh_extra_args': '-o ConnectTimeout=30'
             }
@@ -149,7 +149,7 @@ def generate_inventory(terraform_output: Dict[str, Any]) -> Dict[str, Any]:
             inventory['all']['children']['nat_instance']['hosts']['nat_ec2'] = {
                 'ansible_host': nat_ip,
                 'ansible_user': os.getenv('SSH_USER', 'ec2-user'),
-                'ansible_ssh_private_key_file': os.getenv('SSH_PRIVATE_KEY_FILE', '~/.ssh/wordpress_key'),
+                'ansible_ssh_private_key_file': os.getenv('SSH_PRIVATE_KEY_FILE', '~/.ssh/ssh_key'),
                 'ansible_ssh_common_args': '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null',
                 'ansible_ssh_extra_args': '-o ConnectTimeout=30'
             }

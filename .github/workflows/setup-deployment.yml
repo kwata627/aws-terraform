@@ -167,7 +167,7 @@ jobs:
         $([ -n "${{ github.event.inputs.registrant_phone }}" ] && echo "registrant_phone = \"${{ github.event.inputs.registrant_phone }}\"")
         
         # Database configuration
-        db_password = "breadhouse"
+        db_password = "${{ secrets.DB_PASSWORD || 'your-secure-password-here' }}"
         
         # Instance configuration
         instance_type = "t2.micro"

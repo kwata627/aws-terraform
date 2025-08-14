@@ -17,7 +17,7 @@ define( 'DB_NAME', '{{ wp_db_name | default('wordpress') }}' );
 define( 'DB_USER', '{{ wp_db_user | default('wordpress') }}' );
 
 /** MySQLデータベースパスワード */
-define( 'DB_PASSWORD', '{{ wp_db_password | default('password') }}' );
+define( 'DB_PASSWORD', '{{ wp_db_password | default(lookup('env', 'WORDPRESS_DB_PASSWORD') | default('your-secure-password-here')) }}' );
 
 /** MySQLホスト名 */
 define( 'DB_HOST', '{{ wp_db_host | default('localhost') }}' );

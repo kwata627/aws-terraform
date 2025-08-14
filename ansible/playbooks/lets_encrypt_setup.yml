@@ -1,0 +1,234 @@
+---
+- name: Let's Encrypt SSL/TLS証明書の設定
+  hosts: wordpress
+  become: yes
+  roles:
+    - apache
+  vars:
+    domain_name: "{{ lookup('env', 'DOMAIN_NAME') | default('example.com') }}"
+    lets_encrypt_email: "{{ lookup('env', 'LETS_ENCRYPT_EMAIL') | default('admin@example.com') }}"
+    lets_encrypt_staging: "{{ lookup('env', 'LETS_ENCRYPT_STAGING') | default('false') | bool }}"
+    certbot_dir: "/etc/letsencrypt"
+    webroot_dir: "/var/www/html"
+    ssl_dir: "/etc/ssl/private"
+    apache_ssl_dir: "/etc/httpd/ssl"
+
+  tasks:
+    - name: 必要なパッケージのインストール
+      dnf:
+        name:
+          - certbot
+          - python3-certbot-apache
+          - mod_ssl
+          - openssl
+        state: present
+        update_cache: yes
+
+    - name: SSLディレクトリの作成
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      loop:
+        - "{{ apache_ssl_dir }}"
+        - "{{ webroot_dir }}/.well-known/acme-challenge"
+
+    - name: ACMEチャレンジディレクトリの権限設定
+      file:
+        path: "{{ webroot_dir }}/.well-known/acme-challenge"
+        mode: '0777'
+        owner: apache
+        group: apache
+        recurse: yes
+
+    - name: ACMEチャレンジディレクトリ用の.htaccessファイル作成
+      copy:
+        content: "RewriteEngine Off"
+        dest: "{{ webroot_dir }}/.well-known/acme-challenge/.htaccess"
+        mode: '0644'
+        owner: apache
+        group: apache
+
+    - name: Apache設定でACMEチャレンジアクセスを有効化
+      blockinfile:
+        path: /etc/httpd/conf/httpd.conf
+        marker: "# {mark} ACME_CHALLENGE_CONFIG"
+        block: |
+          # ACMEチャレンジ用の設定
+          Alias /.well-known/acme-challenge/ {{ webroot_dir }}/.well-known/acme-challenge/
+          <Directory "{{ webroot_dir }}/.well-known/acme-challenge">
+              Options None
+              AllowOverride All
+              Require all granted
+          </Directory>
+        insertafter: '^# Further relax access to the default document root:'
+        state: present
+        backup: yes
+
+    - name: 既存のLet's Encrypt証明書を削除
+      command: certbot delete --cert-name {{ domain_name }} --non-interactive
+      ignore_errors: yes
+      when: not lets_encrypt_staging
+
+    - name: 既存のLet's Encrypt証明書を削除（ステージング）
+      command: certbot delete --cert-name {{ domain_name }} --non-interactive
+      ignore_errors: yes
+      when: lets_encrypt_staging
+
+
+
+    - name: Webrootディレクトリの作成
+      file:
+        path: "{{ webroot_dir }}/.well-known/acme-challenge"
+        state: directory
+        mode: '0777'
+        owner: apache
+        group: apache
+
+    # Apache設定の変更は既に完了しているためスキップ
+    # - name: Apache設定ファイルのバックアップ
+    #   copy:
+    #     src: /etc/httpd/conf/httpd.conf
+    #     dest: /etc/httpd/conf/httpd.conf.backup
+    #     remote_src: yes
+    #     mode: '0644'
+
+    # - name: Apache設定でWebrootアクセスを有効化（修正版）
+    #   lineinfile:
+    #     path: /etc/httpd/conf/httpd.conf
+    #     line: '    Alias /.well-known/acme-challenge/ {{ webroot_dir }}/'
+    #     insertafter: '^<Directory "/var/www/html">'
+    #     state: present
+    #     backup: yes
+
+    # - name: Apache設定でWebrootディレクトリの設定を追加（修正版）
+    #   lineinfile:
+    #     path: /etc/httpd/conf/httpd.conf
+    #     line: |
+    #         <Directory "{{ webroot_dir }}">
+    #             Options None
+    #             AllowOverride None
+    #             Require all granted
+    #         </Directory>
+    #     insertafter: '^    Alias /.well-known/acme-challenge/'
+    #     state: present
+    #     backup: yes
+
+    - name: Apache設定の構文チェック
+      command: apachectl configtest
+      register: apache_config_test
+      failed_when: apache_config_test.rc != 0
+
+    - name: Apacheの再起動
+      service:
+        name: httpd
+        state: restarted
+
+    - name: Let's Encrypt証明書の取得（ステージング環境）
+      command: >
+        certbot certonly
+        --webroot
+        --webroot-path={{ webroot_dir }}
+        --email={{ lets_encrypt_email }}
+        --agree-tos
+        --no-eff-email
+        --staging
+        --force-renewal
+        --non-interactive
+        -d {{ domain_name }}
+        -d www.{{ domain_name }}
+      when: lets_encrypt_staging
+      register: certbot_staging_result
+      failed_when: 
+        - certbot_staging_result.rc != 0
+        - "'already exists' not in certbot_staging_result.stderr"
+
+    - name: Let's Encrypt証明書の取得（本番環境）
+      command: >
+        certbot certonly
+        --webroot
+        --webroot-path={{ webroot_dir }}
+        --email={{ lets_encrypt_email }}
+        --agree-tos
+        --no-eff-email
+        --force-renewal
+        --non-interactive
+        -d {{ domain_name }}
+        -d www.{{ domain_name }}
+      when: not lets_encrypt_staging
+      register: certbot_production_result
+      failed_when: 
+        - certbot_production_result.rc != 0
+        - "'already exists' not in certbot_production_result.stderr"
+
+    - name: SSL証明書ファイルのコピー
+      copy:
+        src: "{{ certbot_dir }}/live/{{ domain_name }}/{{ item }}"
+        dest: "{{ apache_ssl_dir }}/{{ item }}"
+        mode: '0644'
+        owner: root
+        group: root
+        remote_src: yes
+      loop:
+        - fullchain.pem
+        - cert.pem
+      notify: restart apache
+
+    - name: SSL秘密鍵ファイルのコピー
+      copy:
+        src: "{{ certbot_dir }}/live/{{ domain_name }}/privkey.pem"
+        dest: "{{ apache_ssl_dir }}/privkey.pem"
+        mode: '0600'
+        owner: root
+        group: root
+        remote_src: yes
+      notify: restart apache
+
+    - name: Apache SSL設定ファイルの作成
+      template:
+        src: ../roles/apache/templates/ssl.conf.j2
+        dest: /etc/httpd/conf.d/ssl.conf
+        mode: '0644'
+        owner: root
+        group: root
+      notify: restart apache
+
+    - name: HTTPからHTTPSへのリダイレクト設定
+      template:
+        src: ../roles/apache/templates/redirect.conf.j2
+        dest: /etc/httpd/conf.d/redirect.conf
+        mode: '0644'
+        owner: root
+        group: root
+      notify: restart apache
+
+    - name: Apacheの再起動
+      service:
+        name: httpd
+        state: restarted
+
+    - name: 証明書の自動更新設定
+      cron:
+        name: "Let's Encrypt証明書の自動更新"
+        minute: "0"
+        hour: "3"
+        day: "1"
+        job: "certbot renew --quiet --post-hook 'systemctl reload httpd'"
+        user: root
+      ignore_errors: yes
+
+    - name: 証明書の有効性確認
+      command: openssl x509 -in {{ apache_ssl_dir }}/cert.pem -text -noout
+      register: cert_info
+
+    - name: 証明書情報の表示
+      debug:
+        msg: "証明書の有効期限: {{ cert_info.stdout | regex_search('Not After : (.+)', '\\1') }}"
+
+  handlers:
+    - name: restart apache
+      service:
+        name: httpd
+        state: restarted
