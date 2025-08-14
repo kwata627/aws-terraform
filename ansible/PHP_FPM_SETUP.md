@@ -25,7 +25,7 @@
 - ServerAliasをEC2インスタンスのIPアドレスに設定
 
 ### 6. デフォルト変数の修正
-- Apacheロール: `wordpress_domain: shamolife.com`に設定
+- Apacheロール: `wordpress_domain: example.com`に設定
 - プレイブック: 環境変数からWordPressドメインを取得するように修正
 
 ### 7. ハンドラーの追加 (`ansible/roles/php/handlers/main.yml`)

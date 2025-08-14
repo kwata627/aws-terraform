@@ -35,17 +35,18 @@ resource "aws_cloudfront_distribution" "main" {
 
   }
 
-  # デフォルトキャッシュビヘイビアの設定
+  # デフォルトキャッシュビヘイビアの設定（その他ページ）
   default_cache_behavior {
-    allowed_methods  = local.cache_behavior_config.allowed_methods
-    cached_methods   = local.cache_behavior_config.cached_methods
+    allowed_methods  = ["GET", "HEAD", "OPTIONS"]
+    cached_methods   = ["GET", "HEAD"]
     target_origin_id = local.cache_behavior_config.target_origin_id
 
     viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
-    min_ttl                = local.cache_behavior_config.min_ttl
-    default_ttl            = local.cache_behavior_config.default_ttl
-    max_ttl                = local.cache_behavior_config.max_ttl
     compress               = local.cache_behavior_config.compress
+
+    # 新しいキャッシュポリシーとオリジンリクエストポリシーを使用
+    cache_policy_id          = aws_cloudfront_cache_policy.dynamic_short.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.dynamic_all.id
 
     # セキュリティヘッダーの設定
     response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
@@ -61,14 +62,300 @@ resource "aws_cloudfront_distribution" "main" {
 
     # リアルタイムログの設定
     realtime_log_config_arn = var.enable_real_time_logs ? aws_cloudfront_realtime_log_config.main[0].arn : null
+  }
 
-    # ForwardedValuesの設定（EC2オリジン用）
-    forwarded_values {
-      query_string = true
-      headers      = ["Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"]
-      cookies {
-        forward = "all"
-      }
+  # 順序付きキャッシュビヘイビア（WordPress最適化が有効な場合のみ）
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      # 1. 管理画面（最優先）
+      path_pattern           = "/wp-admin/*"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.caching_disabled.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.all_to_origin.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      # 2. ログインページ
+      path_pattern           = "/wp-login.php"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.caching_disabled.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.all_to_origin.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      # 3. 静的アセット（CSS）
+      path_pattern           = "*.css"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      # 4. 静的アセット（JavaScript）
+      path_pattern           = "*.js"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  # 5. 静的アセット（画像）
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      path_pattern           = "*.jpg"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      path_pattern           = "*.jpeg"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      path_pattern           = "*.png"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      path_pattern           = "*.gif"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      path_pattern           = "*.webp"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      path_pattern           = "*.svg"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      path_pattern           = "*.ico"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      path_pattern           = "*.woff"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      path_pattern           = "*.woff2"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      path_pattern           = "*.ttf"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      path_pattern           = "*.eot"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_wordpress_optimization ? [1] : []
+    content {
+      # 6. WordPressアップロードファイル
+      path_pattern           = "/wp-content/uploads/*"
+      target_origin_id       = local.cache_behavior_config.target_origin_id
+      viewer_protocol_policy = local.cache_behavior_config.viewer_protocol_policy
+
+      allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      cached_methods  = ["GET", "HEAD"]
+
+      compress = true
+
+      cache_policy_id            = aws_cloudfront_cache_policy.static_long.id
+      origin_request_policy_id   = aws_cloudfront_origin_request_policy.static_minimal.id
+      response_headers_policy_id = var.enable_security_headers ? aws_cloudfront_response_headers_policy.security[0].id : null
     }
   }
 
@@ -170,7 +457,7 @@ resource "aws_cloudfront_response_headers_policy" "security" {
     }
     
     strict_transport_security {
-      access_control_max_age_sec = 31536000
+      access_control_max_age_sec = 63072000  # 2年
       include_subdomains         = true
       preload                    = true
       override                   = true

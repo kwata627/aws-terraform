@@ -185,6 +185,12 @@ variable "enable_security_headers" {
   default     = true
 }
 
+variable "enable_wordpress_optimization" {
+  description = "WordPress最適化の有効化（順序付きキャッシュビヘイビア）"
+  type        = bool
+  default     = true
+}
+
 variable "minimum_protocol_version" {
   description = "最小TLSプロトコルバージョン"
   type        = string
