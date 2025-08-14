@@ -363,25 +363,56 @@ module "route53" {
 # }
 
 # CloudFront CNAMEレコードの作成（CloudFrontディストリビューション作成後）
-resource "null_resource" "cloudfront_cname_creation" {
+# 一時的に無効化
+# resource "null_resource" "cloudfront_cname_creation" {
+#   count = var.enable_cloudfront ? 1 : 0
+#   
+#   triggers = {
+#     cloudfront_domain_name = module.cloudfront.domain_name
+#     domain_name = local.domain_config.domain_name
+#     hosted_zone_id = module.route53.zone_id
+#   }
+#   
+#   provisioner "local-exec" {
+#     environment = {
+#       DOMAIN_NAME = local.domain_config.domain_name
+#       HOSTED_ZONE_ID = module.route53.zone_id
+#       CLOUDFRONT_DOMAIN_NAME = module.cloudfront.domain_name
+#     }
+#     command = "${path.module}/scripts/create_cloudfront_cname.sh"
+#   }
+#   
+#   depends_on = [module.cloudfront]
+# }
+
+# Route53レコードの自動管理（CloudFrontディストリビューション作成後）
+resource "aws_route53_record" "cloudfront_main" {
   count = var.enable_cloudfront ? 1 : 0
   
-  triggers = {
-    cloudfront_domain_name = module.cloudfront.domain_name
-    domain_name = local.domain_config.domain_name
-    hosted_zone_id = module.route53.zone_id
+  zone_id = module.route53.zone_id
+  name    = local.domain_config.domain_name
+  type    = "A"
+
+  alias {
+    name                   = module.cloudfront.domain_name
+    zone_id                = "Z2FDTNDATAQYW2"  # CloudFrontの固定ゾーンID
+    evaluate_target_health = false
   }
+
+  depends_on = [module.cloudfront, module.route53]
+}
+
+resource "aws_route53_record" "cloudfront_cdn" {
+  count = var.enable_cloudfront ? 1 : 0
   
-  provisioner "local-exec" {
-    environment = {
-      DOMAIN_NAME = local.domain_config.domain_name
-      HOSTED_ZONE_ID = module.route53.zone_id
-      CLOUDFRONT_DOMAIN_NAME = module.cloudfront.domain_name
-    }
-    command = "${path.module}/scripts/create_cloudfront_cname.sh"
-  }
-  
-  depends_on = [module.cloudfront]
+  zone_id = module.route53.zone_id
+  name    = "cdn.${local.domain_config.domain_name}"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [module.cloudfront.domain_name]
+
+  depends_on = [module.cloudfront, module.route53]
 }
 
 # -----------------------------------------------------------------------------
