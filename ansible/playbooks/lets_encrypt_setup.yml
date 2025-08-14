@@ -139,6 +139,7 @@
         --non-interactive
         -d {{ domain_name }}
         -d www.{{ domain_name }}
+        -d admin.{{ domain_name }}
       when: lets_encrypt_staging
       register: certbot_staging_result
       failed_when: 
@@ -157,6 +158,7 @@
         --non-interactive
         -d {{ domain_name }}
         -d www.{{ domain_name }}
+        -d admin.{{ domain_name }}
       when: not lets_encrypt_staging
       register: certbot_production_result
       failed_when: 

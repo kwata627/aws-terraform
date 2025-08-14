@@ -92,4 +92,24 @@
     line: 'LoadModule proxy_fcgi_module modules/mod_proxy_fcgi.so'
     state: present
   become: yes
+  notify: restart apache
+
+- name: Ensure mod_rewrite is enabled
+  lineinfile:
+    path: /etc/httpd/conf.modules.d/00-rewrite.conf
+    regexp: '^LoadModule rewrite_module'
+    line: 'LoadModule rewrite_module modules/mod_rewrite.so'
+    state: present
+    create: yes
+  become: yes
+  notify: restart apache 
+
+- name: Create .htaccess file for wp-admin access control
+  template:
+    src: wp-admin.htaccess.j2
+    dest: /var/www/html/wp-admin/.htaccess
+    mode: '0644'
+    owner: apache
+    group: apache
+  become: yes
   notify: restart apache 
