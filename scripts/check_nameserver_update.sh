@@ -1,18 +1,29 @@
 #!/bin/bash
 
 # ネームサーバー更新必要性チェックスクリプト
-# 使用方法: ./check_nameserver_update.sh <domain_name> <nameserver1> <nameserver2> <nameserver3> <nameserver4>
+# 使用方法: ./check_nameserver_update.sh
+# 環境変数から値を読み取る: DOMAIN_NAME, NAMESERVER1, NAMESERVER2, NAMESERVER3, NAMESERVER4
 
 set -e
 
-DOMAIN_NAME="${1}"
-NAMESERVER1="${2}"
-NAMESERVER2="${3}"
-NAMESERVER3="${4}"
-NAMESERVER4="${5}"
+# デバッグ情報を出力
+echo "DEBUG: 環境変数の値を確認中..." >&2
+echo "DEBUG: DOMAIN_NAME='${DOMAIN_NAME}'" >&2
+echo "DEBUG: NAMESERVER1='${NAMESERVER1}'" >&2
+echo "DEBUG: NAMESERVER2='${NAMESERVER2}'" >&2
+echo "DEBUG: NAMESERVER3='${NAMESERVER3}'" >&2
+echo "DEBUG: NAMESERVER4='${NAMESERVER4}'" >&2
+
+# 環境変数から値を取得
+DOMAIN_NAME="${DOMAIN_NAME}"
+NAMESERVER1="${NAMESERVER1}"
+NAMESERVER2="${NAMESERVER2}"
+NAMESERVER3="${NAMESERVER3}"
+NAMESERVER4="${NAMESERVER4}"
 
 if [ -z "$DOMAIN_NAME" ] || [ -z "$NAMESERVER1" ] || [ -z "$NAMESERVER2" ] || [ -z "$NAMESERVER3" ] || [ -z "$NAMESERVER4" ]; then
-    echo "使用方法: $0 <domain_name> <nameserver1> <nameserver2> <nameserver3> <nameserver4>"
+    echo "使用方法: DOMAIN_NAME=domain.com NAMESERVER1=ns1 NAMESERVER2=ns2 NAMESERVER3=ns3 NAMESERVER4=ns4 $0" >&2
+    echo "{\"error\": \"missing_environment_variables\", \"message\": \"環境変数が設定されていません\"}"
     exit 1
 fi
 
@@ -51,3 +62,4 @@ if [ "$ALL_CORRECT" = true ]; then
 else
     echo "{\"needs_update\": true, \"reason\": \"mismatch\", \"domain\": \"${DOMAIN_NAME}\", \"current_ns\": \"${CURRENT_NS}\", \"target_ns\": [\"${NAMESERVER1}\", \"${NAMESERVER2}\", \"${NAMESERVER3}\", \"${NAMESERVER4}\"]}"
 fi
+

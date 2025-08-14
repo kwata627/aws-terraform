@@ -1,18 +1,20 @@
 #!/bin/bash
 
 # ドメインネームサーバー自動更新スクリプト
-# 使用方法: ./update_domain_nameservers.sh <domain_name> <nameserver1> <nameserver2> <nameserver3> <nameserver4>
+# 使用方法: ./update_domain_nameservers.sh
+# 環境変数から値を読み取る: DOMAIN_NAME, NAMESERVER1, NAMESERVER2, NAMESERVER3, NAMESERVER4
 
 set -e
 
-DOMAIN_NAME="${1}"
-NAMESERVER1="${2}"
-NAMESERVER2="${3}"
-NAMESERVER3="${4}"
-NAMESERVER4="${5}"
+# 環境変数から値を取得
+DOMAIN_NAME="${DOMAIN_NAME}"
+NAMESERVER1="${NAMESERVER1}"
+NAMESERVER2="${NAMESERVER2}"
+NAMESERVER3="${NAMESERVER3}"
+NAMESERVER4="${NAMESERVER4}"
 
 if [ -z "$DOMAIN_NAME" ] || [ -z "$NAMESERVER1" ] || [ -z "$NAMESERVER2" ] || [ -z "$NAMESERVER3" ] || [ -z "$NAMESERVER4" ]; then
-    echo "使用方法: $0 <domain_name> <nameserver1> <nameserver2> <nameserver3> <nameserver4>"
+    echo "使用方法: DOMAIN_NAME=domain.com NAMESERVER1=ns1 NAMESERVER2=ns2 NAMESERVER3=ns3 NAMESERVER4=ns4 $0"
     exit 1
 fi
 
@@ -52,3 +54,4 @@ aws route53domains update-domain-nameservers \
 
 echo "✅ ドメインのネームサーバー更新が完了しました"
 echo "{\"updated\": true, \"domain\": \"${DOMAIN_NAME}\", \"nameservers\": [\"${NAMESERVER1}\", \"${NAMESERVER2}\", \"${NAMESERVER3}\", \"${NAMESERVER4}\"]}"
+

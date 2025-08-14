@@ -238,93 +238,6 @@ module "s3" {
 }
 
 # -----------------------------------------------------------------------------
-# CloudFront CNAME自動対処機能
-# -----------------------------------------------------------------------------
-
-# CloudFront CNAMEレコードの存在チェック
-data "external" "cloudfront_cname_check" {
-  count = var.enable_cloudfront ? 1 : 0
-  
-  program = ["bash", "${path.module}/scripts/check_cloudfront_cname.sh"]
-  
-  query = {
-    domain_name = local.domain_config.domain_name
-    hosted_zone_id = module.route53.zone_id
-  }
-  
-  depends_on = [module.route53]
-}
-
-# CloudFront CNAMEレコードの自動クリーンアップ
-resource "null_resource" "cloudfront_cname_cleanup" {
-  count = var.enable_cloudfront && try(data.external.cloudfront_cname_check[0].result.needs_cleanup, false) ? 1 : 0
-  
-  triggers = {
-    domain_name = local.domain_config.domain_name
-    hosted_zone_id = module.route53.zone_id
-    record_value = try(data.external.cloudfront_cname_check[0].result.record_value, "")
-  }
-  
-  provisioner "local-exec" {
-    command = <<-EOT
-      ${path.module}/scripts/cleanup_cloudfront_cname.sh \
-        "${local.domain_config.domain_name}" \
-        "${module.route53.zone_id}" \
-        "${try(data.external.cloudfront_cname_check[0].result.record_value, "")}"
-    EOT
-  }
-  
-  depends_on = [data.external.cloudfront_cname_check]
-}
-
-# -----------------------------------------------------------------------------
-# ドメインネームサーバー自動更新機能
-# -----------------------------------------------------------------------------
-
-# ネームサーバー更新必要性チェック
-data "external" "nameserver_update_check" {
-  count = var.auto_update_nameservers ? 1 : 0
-  
-  program = ["bash", "${path.module}/scripts/check_nameserver_update.sh"]
-  
-  query = {
-    domain_name = local.domain_config.domain_name
-    nameserver1 = module.route53.name_servers[0]
-    nameserver2 = module.route53.name_servers[1]
-    nameserver3 = module.route53.name_servers[2]
-    nameserver4 = module.route53.name_servers[3]
-  }
-  
-  depends_on = [module.route53]
-}
-
-# ドメインネームサーバーの自動更新
-resource "null_resource" "nameserver_update" {
-  count = var.auto_update_nameservers && try(data.external.nameserver_update_check[0].result.needs_update, false) ? 1 : 0
-  
-  triggers = {
-    domain_name = local.domain_config.domain_name
-    nameserver1 = module.route53.name_servers[0]
-    nameserver2 = module.route53.name_servers[1]
-    nameserver3 = module.route53.name_servers[2]
-    nameserver4 = module.route53.name_servers[3]
-  }
-  
-  provisioner "local-exec" {
-    command = <<-EOT
-      ${path.module}/scripts/update_domain_nameservers.sh \
-        "${local.domain_config.domain_name}" \
-        "${module.route53.name_servers[0]}" \
-        "${module.route53.name_servers[1]}" \
-        "${module.route53.name_servers[2]}" \
-        "${module.route53.name_servers[3]}"
-    EOT
-  }
-  
-  depends_on = [data.external.nameserver_update_check]
-}
-
-# -----------------------------------------------------------------------------
 # ACM Module
 # -----------------------------------------------------------------------------
 
@@ -349,7 +262,6 @@ module "acm" {
 # -----------------------------------------------------------------------------
 
 module "cloudfront" {
-  count                 = var.enable_cloudfront ? 1 : 0
   source                = "./modules/cloudfront"
   project               = var.project
   origin_domain_name    = module.ec2.public_dns
@@ -358,7 +270,7 @@ module "cloudfront" {
   environment           = local.environment_config.name
   tags                  = local.common_tags
   
-  depends_on = [module.acm, module.ec2, null_resource.cloudfront_cname_cleanup]
+  depends_on = [module.acm, module.ec2]
 }
 
 # -----------------------------------------------------------------------------
@@ -373,7 +285,7 @@ module "route53" {
   # ドメイン設定
   domain_name = local.domain_config.domain_name
   wordpress_ip = module.ec2.public_ip
-  cloudfront_domain_name = var.enable_cloudfront ? module.cloudfront[0].domain_name : ""
+  cloudfront_domain_name = ""  # 手動でCNAMEレコードを作成するため空に設定
   # certificate_validation_records = module.acm.validation_records # ACMモジュールで自動作成するため削除
   
   # ドメイン登録設定（分析結果に基づいて決定）
@@ -409,3 +321,112 @@ module "route53" {
   
   depends_on = [data.external.domain_analysis]
 }
+
+# -----------------------------------------------------------------------------
+# CloudFront CNAME自動対処機能
+# -----------------------------------------------------------------------------
+
+# CloudFront CNAMEレコードの存在チェック（一時的に無効化）
+# data "external" "cloudfront_cname_check" {
+#   count = var.enable_cloudfront ? 1 : 0
+#   
+#   program = ["bash", "${path.module}/scripts/check_cloudfront_cname.sh"]
+#   
+#   query = {
+#     domain_name = local.domain_config.domain_name
+#     hosted_zone_id = module.route53.zone_id
+#   }
+#   
+#   depends_on = [module.route53]
+# }
+
+# CloudFront CNAMEレコードの自動クリーンアップ（一時的に無効化）
+# resource "null_resource" "cloudfront_cname_cleanup" {
+#   count = var.enable_cloudfront && try(data.external.cloudfront_cname_check[0].result.needs_cleanup, false) ? 1 : 0
+#   
+#   triggers = {
+#     domain_name = local.domain_config.domain_name
+#     hosted_zone_id = module.route53.zone_id
+#     record_value = try(data.external.cloudfront_cname_check[0].result.record_value, "")
+#   }
+#   
+#   provisioner "local-exec" {
+#     environment = {
+#       DOMAIN_NAME = local.domain_config.domain_name
+#       HOSTED_ZONE_ID = module.route53.zone_id
+#       RECORD_VALUE = try(data.external.cloudfront_cname_check[0].result.record_value, "")
+#     }
+#     command = "${path.module}/scripts/cleanup_cloudfront_cname.sh"
+#   }
+#   
+#   depends_on = [data.external.cloudfront_cname_check]
+# }
+
+# CloudFront CNAMEレコードの作成（CloudFrontディストリビューション作成後）
+resource "null_resource" "cloudfront_cname_creation" {
+  count = var.enable_cloudfront ? 1 : 0
+  
+  triggers = {
+    cloudfront_domain_name = module.cloudfront.domain_name
+    domain_name = local.domain_config.domain_name
+    hosted_zone_id = module.route53.zone_id
+  }
+  
+  provisioner "local-exec" {
+    environment = {
+      DOMAIN_NAME = local.domain_config.domain_name
+      HOSTED_ZONE_ID = module.route53.zone_id
+      CLOUDFRONT_DOMAIN_NAME = module.cloudfront.domain_name
+    }
+    command = "${path.module}/scripts/create_cloudfront_cname.sh"
+  }
+  
+  depends_on = [module.cloudfront]
+}
+
+# -----------------------------------------------------------------------------
+# ドメインネームサーバー自動更新機能
+# -----------------------------------------------------------------------------
+
+# ネームサーバー更新必要性チェック（一時的に無効化）
+# data "external" "nameserver_update_check" {
+#   count = var.auto_update_nameservers ? 1 : 0
+#   
+#   program = ["bash", "${path.module}/scripts/check_nameserver_update.sh"]
+#   
+#   query = {
+#     domain_name = local.domain_config.domain_name
+#     nameserver1 = module.route53.name_servers[0]
+#     nameserver2 = module.route53.name_servers[1]
+#     nameserver3 = module.route53.name_servers[2]
+#     nameserver4 = module.route53.name_servers[3]
+#   }
+#   
+#   depends_on = [module.route53]
+# }
+
+# ドメインネームサーバーの自動更新（一時的に無効化）
+# resource "null_resource" "nameserver_update" {
+#   count = var.auto_update_nameservers && try(data.external.nameserver_update_check[0].result.needs_update, false) ? 1 : 0
+#   
+#   triggers = {
+#     domain_name = local.domain_config.domain_name
+#     nameserver1 = module.route53.name_servers[0]
+#     nameserver2 = module.route53.name_servers[1]
+#     nameserver3 = module.route53.name_servers[2]
+#     nameserver4 = module.route53.name_servers[3]
+#   }
+#   
+#   provisioner "local-exec" {
+#     environment = {
+#       DOMAIN_NAME = local.domain_config.domain_name
+#       NAMESERVER1 = module.route53.name_servers[0]
+#       NAMESERVER2 = module.route53.name_servers[1]
+#       NAMESERVER3 = module.route53.name_servers[2]
+#       NAMESERVER4 = module.route53.name_servers[3]
+#     }
+#     command = "${path.module}/scripts/update_domain_nameservers.sh"
+#   }
+#   
+#   depends_on = [data.external.nameserver_update_check]
+# }

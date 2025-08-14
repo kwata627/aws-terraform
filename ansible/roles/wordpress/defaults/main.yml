@@ -41,4 +41,10 @@ wordpress_config_auto: false
 
 # SSL設定
 wordpress_force_ssl: false
-wordpress_ssl_admin: false 
+wordpress_ssl_admin: false
+
+# WordPress初期セットアップ設定
+wordpress_site_title: "{{ lookup('env', 'WORDPRESS_SITE_TITLE') | default('WordPress Site') }}"
+wordpress_admin_user: "{{ lookup('env', 'WORDPRESS_ADMIN_USER') | default('admin') }}"
+wordpress_admin_password: "{{ lookup('env', 'WORDPRESS_ADMIN_PASSWORD') | default('password') }}"
+wordpress_admin_email: "{{ lookup('env', 'WORDPRESS_ADMIN_EMAIL') | default('admin@example.com') }}" 

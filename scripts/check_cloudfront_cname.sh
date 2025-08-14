@@ -1,16 +1,18 @@
 #!/bin/bash
 
 # CloudFront CNAMEレコード存在チェックスクリプト
-# 使用方法: ./check_cloudfront_cname.sh <domain_name> <hosted_zone_id>
+# 使用方法: ./check_cloudfront_cname.sh
+# 環境変数から値を読み取る: DOMAIN_NAME, HOSTED_ZONE_ID
 
 set -e
 
-DOMAIN_NAME="${1}"
-HOSTED_ZONE_ID="${2}"
+# 環境変数から値を取得
+DOMAIN_NAME="${DOMAIN_NAME}"
+HOSTED_ZONE_ID="${HOSTED_ZONE_ID}"
 CNAME_SUBDOMAIN="cdn.${DOMAIN_NAME}"
 
 if [ -z "$DOMAIN_NAME" ] || [ -z "$HOSTED_ZONE_ID" ]; then
-    echo "使用方法: $0 <domain_name> <hosted_zone_id>"
+    echo "使用方法: DOMAIN_NAME=domain.com HOSTED_ZONE_ID=Z1234567890 $0"
     exit 1
 fi
 
@@ -31,3 +33,4 @@ else
         echo "{\"exists\": true, \"record_value\": \"$RECORD_VALUE\", \"needs_cleanup\": false}"
     fi
 fi
+

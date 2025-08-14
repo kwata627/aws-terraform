@@ -491,36 +491,22 @@ output "validation_rds_endpoint" {
 
 output "cloudfront_distribution_id" {
   description = "CloudFrontディストリビューションのID"
-  value       = var.enable_cloudfront ? try(module.cloudfront[0].distribution_id, null) : null
+  value       = try(module.cloudfront.distribution_id, null)
 }
 
 output "cloudfront_domain_name" {
   description = "CloudFrontディストリビューションのドメイン名"
-  value       = var.enable_cloudfront ? try(module.cloudfront[0].domain_name, null) : null
+  value       = try(module.cloudfront.domain_name, null)
 }
 
 output "cloudfront_distribution_arn" {
   description = "CloudFrontディストリビューションのARN"
-  value       = var.enable_cloudfront ? try(module.cloudfront[0].distribution_arn, null) : null
+  value       = try(module.cloudfront.distribution_arn, null)
 }
 
 output "cloudfront_distribution_status" {
   description = "CloudFrontディストリビューションのステータス"
-  value       = var.enable_cloudfront ? try(module.cloudfront[0].distribution_status, null) : null
-}
-
-# -----------------------------------------------------------------------------
-# ネームサーバー更新情報
-# -----------------------------------------------------------------------------
-
-output "nameserver_update_status" {
-  description = "ネームサーバー更新の状況"
-  value = var.auto_update_nameservers ? {
-    needs_update = try(data.external.nameserver_update_check[0].result.needs_update, false)
-    reason       = try(data.external.nameserver_update_check[0].result.reason, "unknown")
-    current_ns   = try(data.external.nameserver_update_check[0].result.current_ns, null)
-    target_ns    = module.route53.name_servers
-  } : null
+  value       = try(module.cloudfront.distribution_status, null)
 }
 
 # -----------------------------------------------------------------------------

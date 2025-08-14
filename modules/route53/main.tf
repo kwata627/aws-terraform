@@ -405,18 +405,18 @@ resource "aws_route53_record" "wordpress" {
   # Route53レコードではタグは使用できないため削除
 }
 
-# CloudFront用CNAMEレコード（CloudFrontディストリビューション作成後に作成）
-resource "aws_route53_record" "cloudfront" {
-  count = var.cloudfront_domain_name != "" && var.cloudfront_domain_name != "placeholder.cloudfront.net" ? 1 : 0
-  
-  zone_id = local.hosted_zone_id
-  name    = "cdn.${local.normalized_domain_name}"
-  type    = "CNAME"
-  ttl     = "300"
-  records = [var.cloudfront_domain_name]
-
-  # Route53レコードではタグは使用できないため削除
-}
+# CloudFront用CNAMEレコード（手動で作成するため無効化）
+# resource "aws_route53_record" "cloudfront" {
+#   count = var.cloudfront_domain_name != "" && var.cloudfront_domain_name != "placeholder.cloudfront.net" ? 1 : 0
+#   
+#   zone_id = local.hosted_zone_id
+#   name    = "cdn.${local.normalized_domain_name}"
+#   type    = "CNAME"
+#   ttl     = "300"
+#   records = [var.cloudfront_domain_name]
+# 
+#   # Route53レコードではタグは使用できないため削除
+# }
 
 # 追加のDNSレコード
 resource "aws_route53_record" "additional" {

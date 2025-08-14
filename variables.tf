@@ -191,32 +191,6 @@ variable "rds_identifier" {
   }
 }
 
-# -----------------------------------------------------------------------------
-# CloudFront Configuration
-# -----------------------------------------------------------------------------
-
-variable "enable_cloudfront" {
-  description = "CloudFrontディストリビューションを有効にするかどうか"
-  type        = bool
-  default     = true
-  
-  validation {
-    condition     = contains([true, false], var.enable_cloudfront)
-    error_message = "enable_cloudfrontは true または false である必要があります。"
-  }
-}
-
-variable "auto_update_nameservers" {
-  description = "ドメインのネームサーバーを自動で更新するかどうか"
-  type        = bool
-  default     = true
-  
-  validation {
-    condition     = contains([true, false], var.auto_update_nameservers)
-    error_message = "auto_update_nameserversは true または false である必要があります。"
-  }
-}
-
 variable "db_password" {
   description = "RDSマスターパスワード（必須）"
   type        = string
@@ -377,4 +351,24 @@ variable "tags" {
     ])
     error_message = "タグのキーは1-128文字、値は256文字以内である必要があります。"
   }
+}
+
+# -----------------------------------------------------------------------------
+# CloudFront Configuration
+# -----------------------------------------------------------------------------
+
+variable "enable_cloudfront" {
+  description = "CloudFrontディストリビューションの有効化"
+  type        = bool
+  default     = true
+}
+
+# -----------------------------------------------------------------------------
+# DNS Management Configuration
+# -----------------------------------------------------------------------------
+
+variable "auto_update_nameservers" {
+  description = "ドメインのネームサーバーを自動更新するかどうか"
+  type        = bool
+  default     = true
 }

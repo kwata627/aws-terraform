@@ -9,6 +9,29 @@
     group: apache
   become: yes
 
+# WP-CLIのインストール
+- name: Download WP-CLI
+  get_url:
+    url: https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+    dest: /tmp/wp-cli.phar
+    mode: '0755'
+    timeout: 300
+  become: yes
+
+- name: Install WP-CLI globally
+  copy:
+    src: /tmp/wp-cli.phar
+    dest: /usr/local/bin/wp
+    mode: '0755'
+    remote_src: yes
+  become: yes
+
+- name: Clean up WP-CLI temporary file
+  file:
+    path: /tmp/wp-cli.phar
+    state: absent
+  become: yes
+
 - name: Download Japanese WordPress
   get_url:
     url: https://ja.wordpress.org/latest-ja.tar.gz
@@ -100,4 +123,38 @@
     owner: apache
     group: apache
     recurse: yes
-  become: yes 
+  become: yes
+
+# WordPress初期セットアップ（データベースが空の場合）
+- name: Check if WordPress is installed
+  mysql_query:
+    login_db: "{{ wordpress_db_name }}"
+    login_host: "{{ wordpress_db_host | regex_replace(':.*', '') }}"
+    login_port: "{{ wordpress_db_host | regex_replace('.*:', '') | default('3306') }}"
+    login_user: "{{ wordpress_db_user }}"
+    login_password: "{{ wordpress_db_password }}"
+    query: "SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = '{{ wordpress_db_name }}' AND table_name LIKE 'wp_%';"
+  register: wp_tables_check
+  become: yes
+  when: wordpress_db_name is defined and wordpress_db_host is defined
+  ignore_errors: yes
+
+- name: Install WordPress if not already installed
+  shell: |
+    cd /var/www/html
+    wp core install \
+      --url='http://{{ ansible_public_ipv4 | default(ansible_default_ipv4.address) }}' \
+      --title='{{ wordpress_site_title | default("WordPress Site") }}' \
+      --admin_user='{{ wordpress_admin_user | default("admin") }}' \
+      --admin_password='{{ wordpress_admin_password | default("password") }}' \
+      --admin_email='{{ wordpress_admin_email | default("admin@example.com") }}' \
+      --skip-email \
+      --allow-root
+  become: yes
+  when: 
+    - wordpress_db_name is defined 
+    - wordpress_db_host is defined
+    - wp_tables_check is defined
+    - wp_tables_check.query_result is defined
+    - wp_tables_check.query_result[0].count | int == 0
+  ignore_errors: yes 
