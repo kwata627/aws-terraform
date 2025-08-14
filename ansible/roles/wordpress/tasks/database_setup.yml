@@ -36,7 +36,7 @@
     login_port: "{{ (wp_db_host | regex_replace('.*:', '') | default('3306')) | int }}"
     login_user: "{{ wp_db_user }}"
     login_password: "{{ wp_db_password }}"
-    query: "UPDATE {{ wp_table_prefix }}options SET option_value = 'https://admin.{{ wordpress_domain | default('example.com') }}' WHERE option_name = 'siteurl';"
+    query: "UPDATE {{ wp_table_prefix }}options SET option_value = 'https://{{ wordpress_domain | default('example.com') }}' WHERE option_name = 'siteurl';"
   become: yes
   when: 
     - wp_db_name is defined 
