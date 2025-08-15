@@ -5,7 +5,7 @@ timezone: Asia/Tokyo
 
 # SSH設定
 ssh_user: ec2-user
-ssh_private_key_file: ~/.ssh/id_rsa
+ssh_private_key_file: ~/.ssh/ssh_key
 
 # システム設定
 system_update: true
@@ -17,4 +17,37 @@ log_retention_days: 7
 
 # 監視設定
 monitoring_enabled: true
-alert_email: admin@example.com 
+alert_email: admin@example.com
+
+# Terraform連携設定
+terraform_output_file: "{{ playbook_dir }}/../terraform_output.json"
+terraform_state_file: "{{ playbook_dir }}/../terraform.tfstate"
+terraform_config_file: "{{ playbook_dir }}/../terraform.tfvars"
+
+# Terraformの値を自動取得
+terraform_output: "{{ terraform_output_file | terraform_output }}"
+terraform_config: "{{ terraform_config_file | load_terraform_config }}"
+
+# WordPress設定（Terraformの値を優先、デフォルト値は普遍的なもの）
+wordpress_domain: "{{ terraform_config.domain_name | default(lookup('env', 'WORDPRESS_DOMAIN') | default('example.com')) }}"
+wordpress_db_host: "{{ terraform_output | terraform_value('rds_endpoint.value') | default(lookup('env', 'WORDPRESS_DB_HOST') | default('localhost')) }}"
+wordpress_db_password: "{{ terraform_config.db_password | default(lookup('env', 'WORDPRESS_DB_PASSWORD') | default('your-secure-password-here')) }}"
+
+# プロジェクト設定（Terraformの値を優先、デフォルト値は普遍的なもの）
+project_name: "{{ terraform_config.project | default(lookup('env', 'PROJECT_NAME') | default('wp-example')) }}"
+
+# EC2設定
+wordpress_public_ip: "{{ terraform_output | terraform_value('wordpress_public_ip.value') }}"
+nat_instance_public_ip: "{{ terraform_output | terraform_value('nat_instance_public_ip.value') }}"
+
+# RDS設定
+rds_endpoint: "{{ terraform_output | terraform_value('rds_endpoint.value') }}"
+rds_identifier: "{{ terraform_output | terraform_value('rds_identifier.value') }}"
+
+# S3設定
+s3_bucket_name: "{{ terraform_output | terraform_value('s3_bucket_name.value') }}"
+s3_bucket_arn: "{{ terraform_output | terraform_value('s3_bucket_arn.value') }}"
+
+# Route53設定
+route53_zone_id: "{{ terraform_output | terraform_value('route53_zone_id.value') }}"
+route53_name_servers: "{{ terraform_output | terraform_value('route53_name_servers.value') }}" 

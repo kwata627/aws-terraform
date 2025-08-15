@@ -1,19 +1,19 @@
 {
     "production": {
-        "ec2_instance_id": "${PROD_EC2_INSTANCE_ID:-}",
-        "rds_identifier": "${PROD_RDS_IDENTIFIER:-wp-shamo-rds}",
-        "wordpress_url": "${PROD_WORDPRESS_URL:-}",
-        "backup_retention_days": "${BACKUP_RETENTION_DAYS:-7}",
-        "ssh_user": "${SSH_USER:-ubuntu}",
-        "ssh_key_path": "${SSH_KEY_PATH:-~/.ssh/id_rsa}"
+        "ec2_id": "${PROD_EC2_ID:-}",
+        "rds_identifier": "${PROD_RDS_IDENTIFIER:-wp-example-rds}",
+        "s3_bucket": "${PROD_S3_BUCKET:-wp-example-s3}",
+        "domain_name": "${PROD_DOMAIN_NAME:-example.com}",
+        "ssh_user": "${SSH_USER:-ec2-user}",
+        "ssh_key_file": "${SSH_PRIVATE_KEY_FILE:-~/.ssh/ssh_key}"
     },
     "validation": {
-        "ec2_instance_id": "${VALID_EC2_INSTANCE_ID:-}",
-        "rds_identifier": "${VALID_RDS_IDENTIFIER:-wp-shamo-rds-validation}",
-        "wordpress_url": "${VALID_WORDPRESS_URL:-}",
-        "test_timeout_minutes": "${TEST_TIMEOUT_MINUTES:-30}",
-        "ssh_user": "${SSH_USER:-ubuntu}",
-        "ssh_key_path": "${SSH_KEY_PATH:-~/.ssh/id_rsa}"
+        "ec2_id": "${VALID_EC2_ID:-}",
+        "rds_identifier": "${VALID_RDS_IDENTIFIER:-wp-example-rds-validation}",
+        "s3_bucket": "${VALID_S3_BUCKET:-wp-example-s3-validation}",
+        "domain_name": "${VALID_DOMAIN_NAME:-test.example.com}",
+        "ssh_user": "${SSH_USER:-ec2-user}",
+        "ssh_key_file": "${SSH_PRIVATE_KEY_FILE:-~/.ssh/ssh_key}"
     },
     "deployment": {
         "auto_approve": "${AUTO_APPROVE:-false}",

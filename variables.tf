@@ -39,7 +39,7 @@ variable "aws_profile" {
 variable "project" {
   description = "プロジェクト名（リソース名のprefix用）"
   type        = string
-  default     = "wp-shamo"
+  default     = "wp-example"
   
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.project)) && length(var.project) >= 3 && length(var.project) <= 20

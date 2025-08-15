@@ -190,8 +190,8 @@ jobs:
       - name: Generate deployment_config.json
         run: |
           # 環境変数の設定
-          export PROJECT="${{ github.event.inputs.project_name || 'wp-shamo' }}"
-          export DOMAIN_NAME="${{ github.event.inputs.domain_name || 'shamolife.com' }}"
+          export PROJECT="${{ github.event.inputs.project_name || 'wp-example' }}"
+          export DOMAIN_NAME="${{ github.event.inputs.domain_name || 'example.com' }}"
           export AWS_REGION="${{ github.event.inputs.aws_region || 'ap-northeast-1' }}"
           
           # 設定ファイルのテンプレートから生成（変数置換付き）

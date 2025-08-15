@@ -4,13 +4,18 @@
 # データベース設定
 wp_db_name: "wordpress"
 wp_db_user: "admin"
-wp_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('your-secure-password-here') }}"
-wp_db_host: "{{ lookup('env', 'WORDPRESS_DB_HOST') | default('localhost') }}"
+wp_db_password: "{{ wordpress_db_password | default('your-secure-password-here') }}"
+wp_db_host: "{{ wordpress_db_host | default('localhost') }}"
 
 # WordPress設定
 wp_table_prefix: "wp_"
 wp_debug: false
 wp_lang: "ja"
+
+# ドメイン設定
+wp_domain: "{{ wordpress_domain | default('example.com') }}"
+wp_site_url: "https://{{ wp_domain }}"
+wp_home_url: "https://{{ wp_domain }}"
 
 # SSL設定
 wp_force_ssl_admin: true

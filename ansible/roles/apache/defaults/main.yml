@@ -1,6 +1,6 @@
 ---
 # Apacheロールのデフォルト変数
-wordpress_domain: example.com
+wordpress_domain: "{{ wordpress_domain | default('example.com') }}"
 apache_user: apache
 apache_group: apache
 document_root: /var/www/html
@@ -9,4 +9,14 @@ document_root: /var/www/html
 apache_modules:
   - rewrite
   - headers
-  - ssl 
+  - ssl
+
+# SSL設定
+apache_enable_ssl: false
+apache_ssl_cert_file: /etc/ssl/certs/ssl-cert-snakeoil.pem
+apache_ssl_key_file: /etc/ssl/private/ssl-cert-snakeoil.key
+
+# セキュリティ設定
+apache_security_headers: true
+apache_hide_server_signature: true
+apache_disable_directory_browsing: true 

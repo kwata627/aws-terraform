@@ -1,21 +1,22 @@
 ---
-# WordPress環境構築プレイブック（CloudFront対応版）
+# WordPress環境構築プレイブック（Terraform連携版）
 - name: Setup WordPress environment
   hosts: wordpress
   become: yes
   vars:
-    # データベース設定
-    wp_db_host: "{{ lookup('env', 'WORDPRESS_DB_HOST') | default('localhost') }}"
+    # データベース設定（Terraformの値を優先）
+    wp_db_host: "{{ wordpress_db_host }}"
     wp_db_name: wordpress
     wp_db_user: admin
-    wp_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password') }}"
+    wp_db_password: "{{ wordpress_db_password }}"
     
-    # WordPress設定
-    wordpress_domain: "{{ lookup('env', 'WORDPRESS_DOMAIN') | default('example.com') }}"
+    # WordPress設定（Terraformの値を優先、デフォルト値を設定）
+    wordpress_domain: "{{ terraform_config.domain_name | default('example.com') }}"
     
-    # SSH設定
-    ssh_private_key: "{{ lookup('env', 'SSH_PRIVATE_KEY_PATH') | default('/tmp/wp-sample-key.pem') }}"
-    ssh_public_key: "{{ lookup('env', 'SSH_PUBLIC_KEY_PATH') | default('/tmp/wp-sample-key.pub') }}"
+    # SSH設定（Terraformの値を優先、デフォルト値も設定）
+    ssh_private_key: "{{ ssh_private_key_file | default('~/.ssh/ssh_key') }}"
+    ssh_public_key: "{{ (ssh_private_key_file | default('~/.ssh/ssh_key')) + '.pub' }}"
+    ssh_user: "ec2-user"
     
     # PHP-FPM設定
     php_fpm_enabled: true
@@ -26,6 +27,16 @@
     # セキュリティ設定
     security_enable_firewall: true
     security_enable_selinux: true
+
+  pre_tasks:
+    - name: Debug variables
+      debug:
+        msg: 
+          - "wordpress_domain: {{ wordpress_domain }}"
+          - "wordpress_db_host: {{ wordpress_db_host }}"
+          - "ssh_private_key_file: {{ ssh_private_key_file | default('not set') }}"
+          - "terraform_output: {{ terraform_output | default('not set') }}"
+          - "terraform_config: {{ terraform_config | default('not set') }}"
   
   roles:
     - system
@@ -39,7 +50,8 @@
   hosts: all
   become: yes
   vars:
-    ssh_private_key: "{{ lookup('env', 'SSH_PRIVATE_KEY_PATH') | default('/tmp/wp-sample-key.pem') }}"
-    ssh_public_key: "{{ lookup('env', 'SSH_PUBLIC_KEY_PATH') | default('/tmp/wp-sample-key.pub') }}"
+    ssh_private_key: "{{ ssh_private_key_file | default('~/.ssh/ssh_key') }}"
+    ssh_public_key: "{{ (ssh_private_key_file | default('~/.ssh/ssh_key')) + '.pub' }}"
+    ssh_user: "ec2-user"
   roles:
     - ssh 

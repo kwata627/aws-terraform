@@ -83,6 +83,46 @@ def run_terraform_output(terraform_dir: str = DEFAULT_TERRAFORM_DIR) -> Optional
         logger.error(f"Terraform出力の取得中にエラーが発生: {e}")
         return None
 
+def load_terraform_config(terraform_dir: str = DEFAULT_TERRAFORM_DIR) -> Optional[Dict[str, Any]]:
+    """Terraform設定ファイルを読み取り"""
+    logger = logging.getLogger(__name__)
+    
+    try:
+        config_file = os.path.join(terraform_dir, "terraform.tfvars")
+        if not os.path.exists(config_file):
+            logger.warning(f"Terraform設定ファイルが見つかりません: {config_file}")
+            return {}
+        
+        config = {}
+        with open(config_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                # コメントと空行をスキップ
+                if not line or line.startswith('#') or line.startswith('//'):
+                    continue
+                
+                # 変数定義を解析
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    
+                    # ブール値の処理
+                    if value.lower() in ['true', 'false']:
+                        value = value.lower() == 'true'
+                    # 数値の処理
+                    elif value.isdigit():
+                        value = int(value)
+                    
+                    config[key] = value
+        
+        logger.info("Terraform設定ファイルの読み取りが完了しました")
+        return config
+        
+    except Exception as e:
+        logger.error(f"Terraform設定ファイルの読み取りに失敗: {e}")
+        return {}
+
 def validate_terraform_output(terraform_output: Dict[str, Any]) -> bool:
     """Terraform出力の検証"""
     logger = logging.getLogger(__name__)
@@ -106,7 +146,7 @@ def validate_terraform_output(terraform_output: Dict[str, Any]) -> bool:
 # インベントリ生成関数
 # =============================================================================
 
-def generate_inventory(terraform_output: Dict[str, Any]) -> Dict[str, Any]:
+def generate_inventory(terraform_output: Dict[str, Any], terraform_config: Dict[str, Any]) -> Dict[str, Any]:
     """Terraformの出力からAnsibleインベントリを生成"""
     logger = logging.getLogger(__name__)
     
@@ -125,14 +165,18 @@ def generate_inventory(terraform_output: Dict[str, Any]) -> Dict[str, Any]:
         }
     }
     
+    # デフォルト値の設定
+    default_ssh_user = terraform_config.get('ssh_user', 'ec2-user')
+    default_ssh_key = terraform_config.get('ssh_private_key_file', '~/.ssh/ssh_key')
+    
     # WordPress EC2の情報を取得
     if 'wordpress_public_ip' in terraform_output:
         wordpress_ip = terraform_output['wordpress_public_ip']['value']
         if wordpress_ip:
             inventory['all']['children']['wordpress']['hosts']['wordpress_ec2'] = {
                 'ansible_host': wordpress_ip,
-                'ansible_user': os.getenv('SSH_USER', 'ec2-user'),
-                'ansible_ssh_private_key_file': os.getenv('SSH_PRIVATE_KEY_FILE', '~/.ssh/ssh_key'),
+                'ansible_user': os.getenv('SSH_USER', default_ssh_user),
+                'ansible_ssh_private_key_file': os.getenv('SSH_PRIVATE_KEY_FILE', default_ssh_key),
                 'ansible_ssh_common_args': '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null',
                 'ansible_ssh_extra_args': '-o ConnectTimeout=30'
             }
@@ -148,8 +192,8 @@ def generate_inventory(terraform_output: Dict[str, Any]) -> Dict[str, Any]:
         if nat_ip:
             inventory['all']['children']['nat_instance']['hosts']['nat_ec2'] = {
                 'ansible_host': nat_ip,
-                'ansible_user': os.getenv('SSH_USER', 'ec2-user'),
-                'ansible_ssh_private_key_file': os.getenv('SSH_PRIVATE_KEY_FILE', '~/.ssh/ssh_key'),
+                'ansible_user': os.getenv('SSH_USER', default_ssh_user),
+                'ansible_ssh_private_key_file': os.getenv('SSH_PRIVATE_KEY_FILE', default_ssh_key),
                 'ansible_ssh_common_args': '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null',
                 'ansible_ssh_extra_args': '-o ConnectTimeout=30'
             }
@@ -266,7 +310,7 @@ def create_inventory_template(output_file: str = "inventory/hosts.template.yml")
                         'wordpress_ec2': {
                             'ansible_host': '{{ wordpress_public_ip }}',
                             'ansible_user': '{{ ssh_user | default("ec2-user") }}',
-                            'ansible_ssh_private_key_file': '{{ ssh_private_key_file | default("~/.ssh/id_rsa") }}',
+                            'ansible_ssh_private_key_file': '{{ ssh_private_key_file | default("~/.ssh/ssh_key") }}',
                             'ansible_ssh_common_args': '-o StrictHostKeyChecking=no'
                         }
                     }
@@ -276,7 +320,7 @@ def create_inventory_template(output_file: str = "inventory/hosts.template.yml")
                         'nat_ec2': {
                             'ansible_host': '{{ nat_instance_public_ip }}',
                             'ansible_user': '{{ ssh_user | default("ec2-user") }}',
-                            'ansible_ssh_private_key_file': '{{ ssh_private_key_file | default("~/.ssh/id_rsa") }}',
+                            'ansible_ssh_private_key_file': '{{ ssh_private_key_file | default("~/.ssh/ssh_key") }}',
                             'ansible_ssh_common_args': '-o StrictHostKeyChecking=no'
                         }
                     }
@@ -330,12 +374,15 @@ def main():
         logger.error("Terraform出力の取得に失敗しました")
         return 1
     
+    # Terraform設定を読み取り
+    terraform_config = load_terraform_config(terraform_dir)
+    
     # Terraform出力の検証
     if not validate_terraform_output(terraform_output):
         logger.warning("Terraform出力の検証で警告が発生しましたが、処理を続行します")
     
     # インベントリを生成
-    inventory = generate_inventory(terraform_output)
+    inventory = generate_inventory(terraform_output, terraform_config)
     
     # インベントリの検証
     if not validate_inventory(inventory):
