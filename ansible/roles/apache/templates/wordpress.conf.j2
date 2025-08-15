@@ -22,9 +22,18 @@
     SSLCertificateKeyFile /etc/letsencrypt/live/{{ wordpress_domain | default('example.com') }}/privkey.pem
 
     # クライアントリクエストサイズ制限（管理画面はより大きな制限）
-    LimitRequestBody 536870912
+    LimitRequestBody 1073741824
     LimitRequestFieldSize 16384
     LimitRequestLine 8190
+
+    # PHP設定（管理画面専用サブドメイン）
+    <IfModule mod_php.c>
+        php_value upload_max_filesize 256M
+        php_value post_max_size 512M
+        php_value max_execution_time 300
+        php_value max_input_time 300
+        php_value memory_limit 512M
+    </IfModule>
 
     <Directory /var/www/html>
         AllowOverride All

@@ -3,34 +3,33 @@
 - name: Update WordPress configuration
   hosts: wordpress
   become: yes
-  
   vars:
-    db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('your-secure-password-here') }}"
+    wordpress_domain: "{{ lookup('env', 'WORDPRESS_DOMAIN') | default(lookup('env', 'DOMAIN_NAME') | default('example.com')) }}"
+    cloudfront_domain: "{{ lookup('env', 'CLOUDFRONT_DOMAIN') | default('') }}"
   
   tasks:
-    - name: Update WordPress URLs in wp-config.php
+    - name: Update wp-config.php with new domain
       replace:
         path: /var/www/html/wp-config.php
-        regexp: "define\\( 'WP_HOME', '.*' \\);"
+        regexp: "define\\( 'WP_HOME', 'https://[^']*' \\);"
         replace: "define( 'WP_HOME', 'https://{{ wordpress_domain | default(cloudfront_domain | default('example.com')) }}' );"
       notify: restart apache
 
-    - name: Update WordPress SITEURL in wp-config.php
+    - name: Update wp-config.php site URL
       replace:
         path: /var/www/html/wp-config.php
-        regexp: "define\\( 'WP_SITEURL', '.*' \\);"
+        regexp: "define\\( 'WP_SITEURL', 'https://[^']*' \\);"
         replace: "define( 'WP_SITEURL', 'https://{{ wordpress_domain | default(cloudfront_domain | default('example.com')) }}' );"
       notify: restart apache
 
-    - name: Update WordPress URLs in database
+    - name: Update WordPress database URLs
       mysql_query:
         login_db: wordpress
-        login_host: "{{ rds_endpoint | regex_replace(':.*', '') }}"
-        login_port: "{{ rds_endpoint | regex_replace('.*:', '') | default('3306') }}"
         login_user: admin
-        login_password: "{{ db_password }}"
+        login_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password') }}"
+        login_host: "{{ lookup('env', 'WORDPRESS_DB_HOST') | default('localhost') }}"
         query: "UPDATE wp_options SET option_value = 'https://{{ wordpress_domain | default(cloudfront_domain | default('example.com')) }}' WHERE option_name IN ('home', 'siteurl');"
-      ignore_errors: yes
+      notify: restart apache
 
   handlers:
     - name: restart apache

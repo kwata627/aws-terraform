@@ -1,0 +1,31 @@
+---
+# Terraform変数読み込みプレイブック
+- name: Load Terraform variables
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  become: no
+  
+  tasks:
+    - name: Check if Terraform state exists
+      stat:
+        path: ../terraform.tfstate
+      register: terraform_state_file
+    
+    - name: Load Terraform variables
+      command: python3 scripts/load_terraform_vars.py
+      args:
+        chdir: "{{ playbook_dir }}"
+      register: terraform_vars_result
+      when: terraform_state_file.stat.exists
+      failed_when: false
+    
+    - name: Display Terraform variables status
+      debug:
+        msg: "Terraform変数の読み込みが完了しました"
+      when: terraform_state_file.stat.exists and terraform_vars_result.rc == 0
+    
+    - name: Display warning for missing Terraform state
+      debug:
+        msg: "Terraform stateファイルが見つかりません。デフォルト値を使用します。"
+      when: not terraform_state_file.stat.exists

@@ -1,9 +1,8 @@
 ---
-- name: Let's Encrypt SSL/TLS証明書の設定
+# Let's Encrypt SSL証明書設定プレイブック
+- name: Setup Let's Encrypt SSL certificates
   hosts: wordpress
   become: yes
-  roles:
-    - apache
   vars:
     domain_name: "{{ lookup('env', 'DOMAIN_NAME') | default('example.com') }}"
     lets_encrypt_email: "{{ lookup('env', 'LETS_ENCRYPT_EMAIL') | default('admin@example.com') }}"
@@ -32,12 +31,15 @@
         owner: root
         group: root
       loop:
-        - "{{ apache_ssl_dir }}"
-        - "{{ webroot_dir }}/.well-known/acme-challenge"
+        - "{{ ssl_conf_dir }}"
+        - "{{ certbot_dir }}/live/{{ domain_name }}/"
+        - "{{ certbot_dir }}/archive/{{ domain_name }}/"
+        - "{{ certbot_dir }}/renewal/{{ domain_name }}/"
+        - "{{ certbot_dir }}/keys/{{ domain_name }}/"
 
     - name: ACMEチャレンジディレクトリの権限設定
       file:
-        path: "{{ webroot_dir }}/.well-known/acme-challenge"
+        path: "{{ certbot_dir }}/live/{{ domain_name }}/"
         mode: '0777'
         owner: apache
         group: apache
@@ -46,7 +48,7 @@
     - name: ACMEチャレンジディレクトリ用の.htaccessファイル作成
       copy:
         content: "RewriteEngine Off"
-        dest: "{{ webroot_dir }}/.well-known/acme-challenge/.htaccess"
+        dest: "{{ certbot_dir }}/live/{{ domain_name }}/.htaccess"
         mode: '0644'
         owner: apache
         group: apache
@@ -57,8 +59,8 @@
         marker: "# {mark} ACME_CHALLENGE_CONFIG"
         block: |
           # ACMEチャレンジ用の設定
-          Alias /.well-known/acme-challenge/ {{ webroot_dir }}/.well-known/acme-challenge/
-          <Directory "{{ webroot_dir }}/.well-known/acme-challenge">
+          Alias /.well-known/acme-challenge/ {{ certbot_dir }}/live/{{ domain_name }}/
+          <Directory "{{ certbot_dir }}/live/{{ domain_name }}">
               Options None
               AllowOverride All
               Require all granted
@@ -81,7 +83,7 @@
 
     - name: Webrootディレクトリの作成
       file:
-        path: "{{ webroot_dir }}/.well-known/acme-challenge"
+        path: "{{ certbot_dir }}/live/{{ domain_name }}/"
         state: directory
         mode: '0777'
         owner: apache
@@ -130,7 +132,7 @@
       command: >
         certbot certonly
         --webroot
-        --webroot-path={{ webroot_dir }}
+        --webroot-path={{ certbot_dir }}/live/{{ domain_name }}
         --email={{ lets_encrypt_email }}
         --agree-tos
         --no-eff-email
@@ -150,7 +152,7 @@
       command: >
         certbot certonly
         --webroot
-        --webroot-path={{ webroot_dir }}
+        --webroot-path={{ certbot_dir }}/live/{{ domain_name }}
         --email={{ lets_encrypt_email }}
         --agree-tos
         --no-eff-email
@@ -168,7 +170,7 @@
     - name: SSL証明書ファイルのコピー
       copy:
         src: "{{ certbot_dir }}/live/{{ domain_name }}/{{ item }}"
-        dest: "{{ apache_ssl_dir }}/{{ item }}"
+        dest: "{{ ssl_conf_dir }}/{{ item }}"
         mode: '0644'
         owner: root
         group: root
@@ -181,7 +183,7 @@
     - name: SSL秘密鍵ファイルのコピー
       copy:
         src: "{{ certbot_dir }}/live/{{ domain_name }}/privkey.pem"
-        dest: "{{ apache_ssl_dir }}/privkey.pem"
+        dest: "{{ ssl_conf_dir }}/privkey.pem"
         mode: '0600'
         owner: root
         group: root
@@ -191,7 +193,7 @@
     - name: Apache SSL設定ファイルの作成
       template:
         src: ../roles/apache/templates/ssl.conf.j2
-        dest: /etc/httpd/conf.d/ssl.conf
+        dest: "{{ apache_conf_dir }}/ssl.conf"
         mode: '0644'
         owner: root
         group: root
@@ -200,7 +202,7 @@
     - name: HTTPからHTTPSへのリダイレクト設定
       template:
         src: ../roles/apache/templates/redirect.conf.j2
-        dest: /etc/httpd/conf.d/redirect.conf
+        dest: "{{ apache_conf_dir }}/redirect.conf"
         mode: '0644'
         owner: root
         group: root
@@ -222,7 +224,7 @@
       ignore_errors: yes
 
     - name: 証明書の有効性確認
-      command: openssl x509 -in {{ apache_ssl_dir }}/cert.pem -text -noout
+      command: openssl x509 -in {{ ssl_conf_dir }}/cert.pem -text -noout
       register: cert_info
 
     - name: 証明書情報の表示

@@ -1,22 +1,50 @@
 ---
 # WordPress環境構築プレイブック（Terraform連携版）
+- name: Load Terraform variables
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  become: no
+  
+  tasks:
+    - name: Check if Terraform state exists
+      stat:
+        path: ../terraform.tfstate
+      register: terraform_state_file
+    
+    - name: Load Terraform variables
+      command: python3 scripts/load_terraform_vars.py
+      args:
+        chdir: "{{ playbook_dir }}"
+      register: terraform_vars_result
+      when: terraform_state_file.stat.exists
+      failed_when: false
+    
+    - name: Display Terraform variables status
+      debug:
+        msg: "Terraform変数の読み込みが完了しました"
+      when: terraform_state_file.stat.exists and terraform_vars_result.rc == 0
+    
+    - name: Display warning for missing Terraform state
+      debug:
+        msg: "Terraform stateファイルが見つかりません。デフォルト値を使用します。"
+      when: not terraform_state_file.stat.exists
+
 - name: Setup WordPress environment
   hosts: wordpress
   become: yes
   vars:
-    # データベース設定（Terraformの値を優先）
-    wp_db_host: "{{ wordpress_db_host }}"
+    # データベース設定
     wp_db_name: wordpress
     wp_db_user: admin
-    wp_db_password: "{{ wordpress_db_password }}"
+    wp_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password') }}"
     
-    # WordPress設定（Terraformの値を優先、デフォルト値を設定）
-    wordpress_domain: "{{ terraform_config.domain_name | default('example.com') }}"
+    # WordPress設定（domain_nameとwordpress_domainを統一）
+    wordpress_domain: "{{ lookup('env', 'WORDPRESS_DOMAIN') | default(lookup('env', 'DOMAIN_NAME') | default('example.com')) }}"
     
-    # SSH設定（Terraformの値を優先、デフォルト値も設定）
-    ssh_private_key: "{{ ssh_private_key_file | default('~/.ssh/ssh_key') }}"
-    ssh_public_key: "{{ (ssh_private_key_file | default('~/.ssh/ssh_key')) + '.pub' }}"
-    ssh_user: "ec2-user"
+    # SSH設定
+    ssh_private_key: "{{ lookup('env', 'SSH_PRIVATE_KEY_PATH') | default('~/.ssh/ssh_key') }}"
+    ssh_public_key: "{{ lookup('env', 'SSH_PUBLIC_KEY_PATH') | default('~/.ssh/ssh_key.pub') }}"
     
     # PHP-FPM設定
     php_fpm_enabled: true
@@ -27,16 +55,6 @@
     # セキュリティ設定
     security_enable_firewall: true
     security_enable_selinux: true
-
-  pre_tasks:
-    - name: Debug variables
-      debug:
-        msg: 
-          - "wordpress_domain: {{ wordpress_domain }}"
-          - "wordpress_db_host: {{ wordpress_db_host }}"
-          - "ssh_private_key_file: {{ ssh_private_key_file | default('not set') }}"
-          - "terraform_output: {{ terraform_output | default('not set') }}"
-          - "terraform_config: {{ terraform_config | default('not set') }}"
   
   roles:
     - system
@@ -50,8 +68,7 @@
   hosts: all
   become: yes
   vars:
-    ssh_private_key: "{{ ssh_private_key_file | default('~/.ssh/ssh_key') }}"
-    ssh_public_key: "{{ (ssh_private_key_file | default('~/.ssh/ssh_key')) + '.pub' }}"
-    ssh_user: "ec2-user"
+    ssh_private_key: "{{ lookup('env', 'SSH_PRIVATE_KEY_PATH') | default('~/.ssh/ssh_key') }}"
+    ssh_public_key: "{{ lookup('env', 'SSH_PUBLIC_KEY_PATH') | default('~/.ssh/ssh_key.pub') }}"
   roles:
     - ssh 

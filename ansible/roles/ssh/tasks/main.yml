@@ -5,14 +5,22 @@
     name: sshd
     state: started
     enabled: yes
-  tags: ssh
 
 - name: Create SSH key directory
   file:
     path: /tmp
     state: directory
     mode: '0755'
-  tags: ssh
+
+# SSH鍵の保存は無効化（ローカルに既に存在するため）
+# - name: Save SSH private key
+#   copy:
+#     content: "{{ ssh_private_key }}"
+#     dest: "{{ ssh_key_file_path | default('~/.ssh/ssh_key') }}"
+#     mode: '0600'
+#     owner: root
+#     group: root
+#   when: ssh_private_key is defined
 
 - name: Create .ssh directory for {{ ssh_user }}
   file:
@@ -21,103 +29,27 @@
     mode: '0700'
     owner: "{{ ssh_user }}"
     group: "{{ ssh_user }}"
-  tags: ssh
 
-# SSH鍵の存在確認と条件分岐処理
-- name: Check if SSH private key file exists locally
+- name: Check if SSH public key file exists
   stat:
-    path: "{{ ssh_private_key | default('~/.ssh/ssh_key') }}"
-  register: ssh_private_key_file_local
-  delegate_to: localhost
-  become: no
-  tags: ssh
+    path: "{{ ssh_public_key }}"
+  register: ssh_public_key_file
 
-- name: Check if SSH public key file exists locally
-  stat:
-    path: "{{ ssh_public_key | default('~/.ssh/ssh_key.pub') }}"
-  register: ssh_public_key_file_local
-  delegate_to: localhost
-  become: no
-  tags: ssh
-
-- name: Check if authorized_keys already exists on server
-  stat:
-    path: /home/{{ ssh_user }}/.ssh/authorized_keys
-  register: ssh_authorized_keys_exists
-  tags: ssh
-
-# ローカルに鍵が存在し、サーバーにauthorized_keysがない場合のみ鍵を設置
-- name: Save SSH private key to server (if not exists)
-  copy:
-    content: "{{ lookup('file', ssh_private_key | default('~/.ssh/ssh_key')) }}"
-    dest: /tmp/ssh_key_temp
-    mode: '0600'
-    owner: root
-    group: root
-  when: 
-    - ssh_private_key_file_local.stat.exists
-    - not ssh_authorized_keys_exists.stat.exists
-  tags: ssh
-
-- name: Save SSH public key to server (if not exists)
-  copy:
-    content: "{{ lookup('file', ssh_public_key | default('~/.ssh/ssh_key.pub')) }}"
-    dest: /tmp/ssh_key_temp.pub
-    mode: '0644'
-    owner: root
-    group: root
-  when: 
-    - ssh_public_key_file_local.stat.exists
-    - not ssh_authorized_keys_exists.stat.exists
-  tags: ssh
-
-- name: Set authorized_keys for {{ ssh_user }} (if not exists)
+- name: Set authorized_keys for {{ ssh_user }}
   authorized_key:
     user: "{{ ssh_user }}"
     state: present
-    key: "{{ lookup('file', ssh_public_key | default('~/.ssh/ssh_key.pub')) }}"
+    key: "{{ lookup('file', ssh_public_key) }}"
     manage_dir: no
-  when: 
-    - ssh_public_key_file_local.stat.exists
-    - not ssh_authorized_keys_exists.stat.exists
-  tags: ssh
+  when: ssh_public_key_file.stat.exists
 
-- name: Ensure correct permissions on authorized_keys (if not exists)
+- name: Ensure correct permissions on authorized_keys
   file:
     path: /home/{{ ssh_user }}/.ssh/authorized_keys
     mode: '0600'
     owner: "{{ ssh_user }}"
     group: "{{ ssh_user }}"
-  when: 
-    - ssh_public_key_file_local.stat.exists
-    - not ssh_authorized_keys_exists.stat.exists
-  tags: ssh
-
-- name: Clean up temporary SSH key files
-  file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - /tmp/ssh_key_temp
-    - /tmp/ssh_key_temp.pub
-  when: 
-    - ssh_private_key_file_local.stat.exists
-    - not ssh_authorized_keys_exists.stat.exists
-  tags: ssh
-
-# SSH鍵が既に存在する場合のメッセージ
-- name: Display SSH key already exists message
-  debug:
-    msg: "SSH authorized_keys already exists on server. Skipping key setup."
-  when: ssh_authorized_keys_exists.stat.exists
-  tags: ssh
-
-# ローカルに鍵が存在しない場合のメッセージ
-- name: Display SSH key not found message
-  debug:
-    msg: "SSH key files not found locally. Skipping key setup."
-  when: not ssh_private_key_file_local.stat.exists or not ssh_public_key_file_local.stat.exists
-  tags: ssh
+  when: ssh_public_key_file.stat.exists
 
 - name: Configure SSH daemon settings
   lineinfile:
@@ -130,9 +62,7 @@
     - { regexp: '^#?AuthorizedKeysFile', line: 'AuthorizedKeysFile .ssh/authorized_keys' }
     - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication {{ "yes" if ssh_password_authentication else "no" }}' }
   notify: restart sshd
-  tags: ssh
 
 - name: Test SSH configuration
   command: sshd -t
-  changed_when: false
-  tags: ssh 
+  changed_when: false 

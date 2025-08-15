@@ -1,62 +1,39 @@
 ---
-# WordPressデータベース初期化タスク
-- name: Check if WordPress database exists
+# WordPressデータベース設定の更新
+- name: Update WordPress home URL
   mysql_query:
     login_db: "{{ wp_db_name }}"
-    login_host: "{{ wp_db_host | regex_replace(':.*', '') }}"
-    login_port: "{{ (wp_db_host | regex_replace('.*:', '') | default('3306')) | int }}"
     login_user: "{{ wp_db_user }}"
     login_password: "{{ wp_db_password }}"
-    query: "SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = '{{ wp_db_name }}' AND table_name LIKE '{{ wp_table_prefix }}%';"
-  register: wp_tables_check
-  become: yes
-  when: wp_db_name is defined and wp_db_host is defined
-  ignore_errors: yes
-
-- name: Update WordPress home URL in database
-  mysql_query:
-    login_db: "{{ wp_db_name }}"
-    login_host: "{{ wp_db_host | regex_replace(':.*', '') }}"
-    login_port: "{{ (wp_db_host | regex_replace('.*:', '') | default('3306')) | int }}"
-    login_user: "{{ wp_db_user }}"
-    login_password: "{{ wp_db_password }}"
+    login_host: "{{ rds_endpoint | regex_replace(':.*', '') }}"
+    login_port: "{{ (rds_endpoint | regex_replace('.*:', '') | default('3306')) | int }}"
     query: "UPDATE {{ wp_table_prefix }}options SET option_value = 'https://{{ wordpress_domain | default('example.com') }}' WHERE option_name = 'home';"
   become: yes
-  when: 
-    - wp_db_name is defined 
-    - wp_db_host is defined
-    - wp_tables_check is defined
-    - wp_tables_check.query_result is defined
-    - wp_tables_check.query_result[0].count | int > 0
+  when: rds_endpoint is defined and rds_endpoint != 'localhost' and rds_endpoint != '127.0.0.1'
 
-- name: Update WordPress site URL in database
+- name: Update WordPress site URL
   mysql_query:
     login_db: "{{ wp_db_name }}"
-    login_host: "{{ wp_db_host | regex_replace(':.*', '') }}"
-    login_port: "{{ (wp_db_host | regex_replace('.*:', '') | default('3306')) | int }}"
     login_user: "{{ wp_db_user }}"
     login_password: "{{ wp_db_password }}"
+    login_host: "{{ rds_endpoint | regex_replace(':.*', '') }}"
+    login_port: "{{ (rds_endpoint | regex_replace('.*:', '') | default('3306')) | int }}"
     query: "UPDATE {{ wp_table_prefix }}options SET option_value = 'https://{{ wordpress_domain | default('example.com') }}' WHERE option_name = 'siteurl';"
   become: yes
-  when: 
-    - wp_db_name is defined 
-    - wp_db_host is defined
-    - wp_tables_check is defined
-    - wp_tables_check.query_result is defined
-    - wp_tables_check.query_result[0].count | int > 0
+  when: rds_endpoint is defined and rds_endpoint != 'localhost' and rds_endpoint != '127.0.0.1'
 
 - name: Set WordPress SSL settings in database
   mysql_query:
     login_db: "{{ wp_db_name }}"
-    login_host: "{{ wp_db_host | regex_replace(':.*', '') }}"
-    login_port: "{{ (wp_db_host | regex_replace('.*:', '') | default('3306')) | int }}"
+    login_host: "{{ rds_endpoint | regex_replace(':.*', '') }}"
+    login_port: "{{ (rds_endpoint | regex_replace('.*:', '') | default('3306')) | int }}"
     login_user: "{{ wp_db_user }}"
     login_password: "{{ wp_db_password }}"
     query: "INSERT INTO {{ wp_table_prefix }}options (option_name, option_value, autoload) VALUES ('force_ssl_admin', '1', 'yes') ON DUPLICATE KEY UPDATE option_value = '1';"
   become: yes
   when: 
     - wp_db_name is defined 
-    - wp_db_host is defined
+    - rds_endpoint is defined
     - wp_tables_check is defined
     - wp_tables_check.query_result is defined
     - wp_tables_check.query_result[0].count | int > 0
@@ -64,15 +41,15 @@
 - name: Set WordPress SSL login settings in database
   mysql_query:
     login_db: "{{ wp_db_name }}"
-    login_host: "{{ wp_db_host | regex_replace(':.*', '') }}"
-    login_port: "{{ (wp_db_host | regex_replace('.*:', '') | default('3306')) | int }}"
+    login_host: "{{ rds_endpoint | regex_replace(':.*', '') }}"
+    login_port: "{{ (rds_endpoint | regex_replace('.*:', '') | default('3306')) | int }}"
     login_user: "{{ wp_db_user }}"
     login_password: "{{ wp_db_password }}"
     query: "INSERT INTO {{ wp_table_prefix }}options (option_name, option_value, autoload) VALUES ('force_ssl_login', '1', 'yes') ON DUPLICATE KEY UPDATE option_value = '1';"
   become: yes
   when: 
     - wp_db_name is defined 
-    - wp_db_host is defined
+    - rds_endpoint is defined
     - wp_tables_check is defined
     - wp_tables_check.query_result is defined
     - wp_tables_check.query_result[0].count | int > 0
@@ -80,15 +57,15 @@
 - name: Clear WordPress cache
   mysql_query:
     login_db: "{{ wp_db_name }}"
-    login_host: "{{ wp_db_host | regex_replace(':.*', '') }}"
-    login_port: "{{ (wp_db_host | regex_replace('.*:', '') | default('3306')) | int }}"
+    login_host: "{{ rds_endpoint | regex_replace(':.*', '') }}"
+    login_port: "{{ (rds_endpoint | regex_replace('.*:', '') | default('3306')) | int }}"
     login_user: "{{ wp_db_user }}"
     login_password: "{{ wp_db_password }}"
     query: "DELETE FROM {{ wp_table_prefix }}options WHERE option_name LIKE '%_transient_%';"
   become: yes
   when: 
     - wp_db_name is defined 
-    - wp_db_host is defined
+    - rds_endpoint is defined
     - wp_tables_check is defined
     - wp_tables_check.query_result is defined
     - wp_tables_check.query_result[0].count | int > 0

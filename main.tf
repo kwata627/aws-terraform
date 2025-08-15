@@ -451,33 +451,34 @@ resource "aws_route53_record" "wordpress_direct" {
 # }
 
 # Ansible実行（WordPress設定適用）
-resource "null_resource" "ansible_wordpress_setup" {
-  triggers = {
-    ec2_instance = module.ec2.instance_id
-    wordpress_config = filemd5("${path.module}/ansible/roles/wordpress/templates/wp-config.php.j2")
-    apache_config = filemd5("${path.module}/ansible/roles/apache/templates/wordpress.conf.j2")
-    htaccess_config = filemd5("${path.module}/ansible/roles/wordpress/templates/.htaccess.j2")
-    apache_htaccess_config = filemd5("${path.module}/ansible/roles/apache/templates/wordpress.htaccess.j2")
-    php_config = filemd5("${path.module}/ansible/roles/php/templates/www.conf.j2")
-  }
-  
-  provisioner "local-exec" {
-    environment = {
-      WORDPRESS_DB_HOST = module.rds.db_endpoint
-      WORDPRESS_DB_PASSWORD = var.db_password
-      WORDPRESS_DOMAIN = local.domain_config.domain_name
-      SSH_PRIVATE_KEY_PATH = module.ssh.private_key_path
-      SSH_PUBLIC_KEY_PATH = module.ssh.public_key_path
-      SSH_KEY_FILE_PATH = module.ssh.private_key_path
-      SSH_PUBLIC_KEY_FILE_PATH = module.ssh.public_key_path
-      WP_ADMIN_USER = "admin"
-      WP_ADMIN_PASSWORD = var.db_password
-    }
-    command = "ansible-playbook ${path.module}/ansible/playbooks/wordpress_setup.yml"
-  }
-  
-  depends_on = [module.ec2, module.rds, module.ssh]
-}
+# resource "null_resource" "ansible_wordpress_setup" {
+#   triggers = {
+#     ec2_instance = module.ec2.instance_id
+#     wordpress_config = filemd5("${path.module}/ansible/roles/wordpress/templates/wp-config.php.j2")
+#     apache_config = filemd5("${path.module}/ansible/roles/apache/templates/wordpress.conf.j2")
+#     htaccess_config = filemd5("${path.module}/ansible/roles/wordpress/templates/.htaccess.j2")
+#     apache_htaccess_config = filemd5("${path.module}/ansible/roles/apache/templates/wordpress.htaccess.j2")
+#     php_config = filemd5("${path.module}/ansible/roles/php/templates/www.conf.j2")
+#   }
+#   
+#   provisioner "local-exec" {
+#     working_dir = "${path.module}/ansible"
+#     environment = {
+#       WORDPRESS_DB_HOST = module.rds.db_endpoint
+#       WORDPRESS_DB_PASSWORD = var.db_password
+#       WORDPRESS_DOMAIN = local.domain_config.domain_name
+#       SSH_PRIVATE_KEY_PATH = module.ssh.private_key_path
+#       SSH_PUBLIC_KEY_PATH = module.ssh.public_key_path
+#       SSH_KEY_FILE_PATH = module.ssh.private_key_path
+#       SSH_PUBLIC_KEY_FILE_PATH = module.ssh.public_key_path
+#       WP_ADMIN_USER = "admin"
+#       WP_ADMIN_PASSWORD = var.db_password
+#     }
+#     command = "python3 generate_inventory.py && ansible-playbook --config ansible.cfg -i inventory/hosts.yml playbooks/wordpress_setup.yml -v"
+#   }
+#   
+#   depends_on = [module.ec2, module.rds, module.ssh]
+# }
 
 # -----------------------------------------------------------------------------
 # ドメインネームサーバー自動更新機能
