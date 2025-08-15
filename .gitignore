@@ -11,6 +11,7 @@ crash.log
 !*.tfvars.example
 deployment_config.json
 !deployment_config.example.json
+wp-shamo-key.pem
 
 # Logs
 *.log

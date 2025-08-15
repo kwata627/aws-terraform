@@ -168,7 +168,7 @@ main() {
             fi
             
             # プロジェクト名が含まれている場合
-            if [[ "$comment" == *"wp-shamo"* ]]; then
+            if [[ "$comment" == *"wordpress-project"* ]]; then
                 score=$((score + 15))
                 log "  スコア: +15 (プロジェクト名一致)"
             fi

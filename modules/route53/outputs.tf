@@ -57,7 +57,7 @@ output "domain_auto_renew" {
 
 output "registered_domain_name" {
   description = "登録されたドメイン名"
-  value       = var.register_domain ? aws_route53domains_registered_domain.main[0].domain_name : null
+  value       = var.register_domain && length(aws_route53domains_registered_domain.main) > 0 ? aws_route53domains_registered_domain.main[0].domain_name : null
 }
 
 # -----------------------------------------------------------------------------
@@ -131,22 +131,22 @@ output "query_logging_enabled" {
 
 output "query_log_group_arn" {
   description = "DNSクエリログ用CloudWatch Log GroupのARN"
-  value       = var.enable_query_logging ? aws_cloudwatch_log_group.route53_query_logs[0].arn : null
+  value       = var.enable_query_logging && length(aws_cloudwatch_log_group.route53_query_logs) > 0 ? aws_cloudwatch_log_group.route53_query_logs[0].arn : null
 }
 
 output "query_log_group_name" {
   description = "DNSクエリログ用CloudWatch Log Groupの名前"
-  value       = var.enable_query_logging ? aws_cloudwatch_log_group.route53_query_logs[0].name : null
+  value       = var.enable_query_logging && length(aws_cloudwatch_log_group.route53_query_logs) > 0 ? aws_cloudwatch_log_group.route53_query_logs[0].name : null
 }
 
 output "query_logging_role_arn" {
   description = "DNSクエリログ用IAMロールのARN"
-  value       = var.enable_query_logging ? aws_iam_role.route53_query_logging[0].arn : null
+  value       = var.enable_query_logging && length(aws_iam_role.route53_query_logging) > 0 ? aws_iam_role.route53_query_logging[0].arn : null
 }
 
 output "query_log_retention_days" {
   description = "DNSクエリログの保持期間（日数）"
-  value       = var.enable_query_logging ? aws_cloudwatch_log_group.route53_query_logs[0].retention_in_days : null
+  value       = var.enable_query_logging && length(aws_cloudwatch_log_group.route53_query_logs) > 0 ? aws_cloudwatch_log_group.route53_query_logs[0].retention_in_days : null
 }
 
 # -----------------------------------------------------------------------------
@@ -160,12 +160,12 @@ output "dnssec_enabled" {
 
 output "dnssec_key_signing_key" {
   description = "DNSSEC鍵署名鍵の情報"
-  value       = var.enable_dnssec ? aws_route53_key_signing_key.main[0].id : null
+  value       = var.enable_dnssec && length(aws_route53_key_signing_key.main) > 0 ? aws_route53_key_signing_key.main[0].id : null
 }
 
 output "dnssec_key_signing_key_arn" {
   description = "DNSSEC鍵署名鍵のARN"
-  value       = var.enable_dnssec ? aws_route53_key_signing_key.main[0].key_management_service_arn : null
+  value       = var.enable_dnssec && length(aws_route53_key_signing_key.main) > 0 ? aws_route53_key_signing_key.main[0].key_management_service_arn : null
 }
 
 output "dnssec_signing_algorithm" {

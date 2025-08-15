@@ -3,4 +3,3 @@ wordpress_domain: shamolife.com
 rds_endpoint: wp-shamo-rds.cjg0emy2snss.ap-northeast-1.rds.amazonaws.com:3306
 s3_bucket_name: wp-shamo-wp-shamo-s3-mf1euyms
 ssh_key_name: wp-shamo-ssh-key
-wp_db_password: breadhouse

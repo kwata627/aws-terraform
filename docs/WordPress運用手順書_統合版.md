@@ -151,7 +151,7 @@ terraform output -raw connection_info
 ```bash
 # 検証環境の停止（自動で実行される）
 aws ec2 stop-instances --instance-ids [検証用EC2のID]
-aws rds stop-db-instance --db-instance-identifier wp-shamo-rds-validation
+aws rds stop-db-instance --db-instance-identifier wordpress-project-rds-validation
 ```
 
 ---

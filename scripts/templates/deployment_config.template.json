@@ -1,7 +1,7 @@
 {
     "production": {
         "ec2_instance_id": "${PROD_EC2_INSTANCE_ID:-}",
-        "rds_identifier": "${PROD_RDS_IDENTIFIER:-wp-shamo-rds}",
+        "rds_identifier": "${PROD_RDS_IDENTIFIER:-wordpress-project-rds}",
         "wordpress_url": "${PROD_WORDPRESS_URL:-}",
         "backup_retention_days": "${BACKUP_RETENTION_DAYS:-7}",
         "ssh_user": "${SSH_USER:-ubuntu}",
@@ -9,7 +9,7 @@
     },
     "validation": {
         "ec2_instance_id": "${VALID_EC2_INSTANCE_ID:-}",
-        "rds_identifier": "${VALID_RDS_IDENTIFIER:-wp-shamo-rds-validation}",
+        "rds_identifier": "${VALID_RDS_IDENTIFIER:-wordpress-project-rds-validation}",
         "wordpress_url": "${VALID_WORDPRESS_URL:-}",
         "test_timeout_minutes": "${TEST_TIMEOUT_MINUTES:-30}",
         "ssh_user": "${SSH_USER:-ubuntu}",

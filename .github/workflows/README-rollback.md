@@ -52,7 +52,7 @@
 {
   "production": {
     "ec2_instance_id": "i-xxxxxxxxx",
-    "rds_identifier": "wp-shamo-rds",
+    "rds_identifier": "wordpress-project-rds",
     "wordpress_url": "https://example.com"
   }
 }

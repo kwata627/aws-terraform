@@ -48,12 +48,12 @@ GitHubリポジトリの設定で以下の環境を作成してください：
 {
     "production": {
         "ec2_instance_id": "i-xxxxxxxxx",
-        "rds_identifier": "wp-shamo-rds",
-        "wordpress_url": "http://shamonooyuuhan.com"
+        "rds_identifier": "wordpress-project-rds",
+        "wordpress_url": "https://example.com"
     },
     "validation": {
         "ec2_instance_id": "i-yyyyyyyyy",
-        "rds_identifier": "wp-shamo-rds-validation",
+        "rds_identifier": "wordpress-project-rds-validation",
         "wordpress_url": "http://validation-ip"
     },
     "deployment": {

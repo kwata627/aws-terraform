@@ -55,13 +55,13 @@
 {
   "production": {
     "ec2_instance_id": "i-xxxxxxxxx",
-    "rds_identifier": "wp-shamo-rds"
+    "rds_identifier": "wordpress-project-rds"
   },
   "validation": {
     "ec2_instance_id": "i-xxxxxxxxx",
-    "rds_identifier": "wp-shamo-rds-validation",
+    "rds_identifier": "wordpress-project-rds-validation",
     "wordpress_url": "http://validation.example.com",
-    "db_password": "password"
+            "db_password": "your-secure-password-here"
   }
 }
 ```

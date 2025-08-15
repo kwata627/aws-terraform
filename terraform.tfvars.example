@@ -18,7 +18,7 @@ aws_profile = "default"
 # Project Configuration
 # -----------------------------------------------------------------------------
 
-project = "wp-example"
+project = "wordpress-project"
 environment = "production"
 
 # -----------------------------------------------------------------------------
@@ -36,7 +36,7 @@ az1 = "ap-northeast-1a"
 
 # EC2名（空の場合は自動生成: ${var.project}-ec2）
 ec2_name = ""
-# 検証用EC2名（空の場合は自動生成: ${var.project}-test-ec2）
+# 検証用EC2名（空の場合は自動生成: ${var.project}-validation-ec2）
 validation_ec2_name = ""
 ami_id = "ami-095af7cb7ddb447ef"  # Amazon Linux 2023
 instance_type = "t2.micro"
@@ -103,7 +103,7 @@ ssh_allowed_cidr = "0.0.0.0/0"
 # -----------------------------------------------------------------------------
 
 tags = {
-  Owner       = "your-name"
+  Owner       = "developer"
   Purpose     = "wordpress-infrastructure"
   CostCenter  = "development"
   Backup      = "enabled"

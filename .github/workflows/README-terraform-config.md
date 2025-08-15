@@ -150,13 +150,13 @@ registrant_phone = "+81.1234567890"
 {
     "production": {
         "ec2_instance_id": "",
-        "rds_identifier": "wp-shamo-rds",
+        "rds_identifier": "wordpress-project-rds",
         "wordpress_url": "http://example.com",
         "backup_retention_days": 7
     },
     "validation": {
         "ec2_instance_id": "",
-        "rds_identifier": "wp-shamo-rds-validation",
+        "rds_identifier": "wordpress-project-rds-validation",
         "wordpress_url": "http://validation-ip",
         "test_timeout_minutes": 30
     },

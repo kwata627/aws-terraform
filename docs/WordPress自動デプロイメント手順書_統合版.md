@@ -345,7 +345,7 @@ ssh -i ~/.ssh/id_rsa ec2-user@[EC2_IP] "echo 'SSH接続成功'"
 #### 3. データベース接続エラー
 ```bash
 # RDSエンドポイントの確認
-aws rds describe-db-instances --db-instance-identifier wp-shamo-rds
+aws rds describe-db-instances --db-instance-identifier wordpress-project-rds
 
 # セキュリティグループの確認
 aws ec2 describe-security-groups --group-ids [セキュリティグループID]

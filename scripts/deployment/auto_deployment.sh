@@ -56,10 +56,10 @@ load_deployment_config() {
     
     # 設定値の読み込み
     PROD_EC2_ID=$(load_config "$CONFIG_FILE" ".production.ec2_instance_id")
-    PROD_RDS_ID=$(load_config "$CONFIG_FILE" ".production.rds_identifier" "wp-shamo-rds")
+    PROD_RDS_ID=$(load_config "$CONFIG_FILE" ".production.rds_identifier" "wordpress-project-rds")
     PROD_WP_URL=$(load_config "$CONFIG_FILE" ".production.wordpress_url")
     VALID_EC2_ID=$(load_config "$CONFIG_FILE" ".validation.ec2_instance_id")
-    VALID_RDS_ID=$(load_config "$CONFIG_FILE" ".validation.rds_identifier" "wp-shamo-rds-validation")
+    VALID_RDS_ID=$(load_config "$CONFIG_FILE" ".validation.rds_identifier" "wordpress-project-rds-validation")
     VALID_WP_URL=$(load_config "$CONFIG_FILE" ".validation.wordpress_url")
     AUTO_APPROVE=$(load_config "$CONFIG_FILE" ".deployment.auto_approve" "false")
     ROLLBACK_ON_FAILURE=$(load_config "$CONFIG_FILE" ".deployment.rollback_on_failure" "true")

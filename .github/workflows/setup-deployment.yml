@@ -117,7 +117,7 @@ jobs:
         {
             "production": {
                 "ec2_instance_id": "${{ steps.terraform_outputs.outputs.prod_ec2_id }}",
-                "rds_identifier": "wp-shamo-rds",
+                "rds_identifier": "wordpress-project-rds",
                 "wordpress_url": "https://${{ github.event.inputs.domain_name }}",
                 "backup_retention_days": 7,
                 "ssh_user": "ec2-user",
@@ -125,7 +125,7 @@ jobs:
             },
             "validation": {
                 "ec2_instance_id": "${{ steps.terraform_outputs.outputs.valid_ec2_id }}",
-                "rds_identifier": "wp-shamo-rds-validation",
+                "rds_identifier": "wordpress-project-rds-validation",
                 "wordpress_url": "http://validation-ip",
                 "test_timeout_minutes": 30,
                 "ssh_user": "ec2-user",

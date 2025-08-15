@@ -117,7 +117,7 @@ setup_environment() {
     
     # 環境変数の設定
     export WORDPRESS_DB_HOST="$RDS_ENDPOINT"
-    export WORDPRESS_DB_PASSWORD="${DB_PASSWORD:-password}"
+    export WORDPRESS_DB_PASSWORD="${DB_PASSWORD:-your-secure-password-here}"
     export WORDPRESS_DB_NAME="wordpress"
     export WORDPRESS_DB_USER="wordpress"
     

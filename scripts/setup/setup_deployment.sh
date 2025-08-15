@@ -57,13 +57,13 @@ cat > deployment_config.json << 'EOF'
 {
     "production": {
         "ec2_instance_id": "",
-        "rds_identifier": "wp-shamo-rds",
+        "rds_identifier": "wordpress-project-rds",
         "wordpress_url": "",
         "backup_retention_days": 7
     },
     "validation": {
         "ec2_instance_id": "",
-        "rds_identifier": "wp-shamo-rds-validation",
+        "rds_identifier": "wordpress-project-rds-validation",
         "wordpress_url": "",
         "test_timeout_minutes": 30
     },

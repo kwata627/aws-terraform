@@ -170,7 +170,7 @@ test_database_connection() {
     log "データベース接続をテスト中..."
     
     # SSH経由でデータベース接続テスト
-    if ssh wordpress-server "mysql -h $RDS_ENDPOINT -u wordpress -p'${WORDPRESS_DB_PASSWORD:-password}' -e 'SELECT 1;'" 2>/dev/null; then
+    if ssh wordpress-server "mysql -h $RDS_ENDPOINT -u wordpress -p'${WORDPRESS_DB_PASSWORD:-your-secure-password-here}' -e 'SELECT 1;'" 2>/dev/null; then
         success "データベース接続テスト成功"
     else
         error "データベース接続テストに失敗しました"
@@ -178,7 +178,7 @@ test_database_connection() {
     fi
     
     # WordPressデータベースの確認
-    if ssh wordpress-server "mysql -h $RDS_ENDPOINT -u wordpress -p'${WORDPRESS_DB_PASSWORD:-password}' -e 'USE wordpress; SHOW TABLES;'" 2>/dev/null | grep -q "wp_"; then
+    if ssh wordpress-server "mysql -h $RDS_ENDPOINT -u wordpress -p'${WORDPRESS_DB_PASSWORD:-your-secure-password-here}' -e 'USE wordpress; SHOW TABLES;'" 2>/dev/null | grep -q "wp_"; then
         success "WordPressデータベースの確認成功"
     else
         warning "WordPressデータベースの確認に失敗しました（WordPressの初期設定が必要かもしれません）"
@@ -205,7 +205,7 @@ test_services() {
     fi
     
     # MySQL接続確認
-    if ssh wordpress-server "mysql -h $RDS_ENDPOINT -u wordpress -p'${WORDPRESS_DB_PASSWORD:-password}' -e 'SELECT VERSION();'" 2>/dev/null; then
+    if ssh wordpress-server "mysql -h $RDS_ENDPOINT -u wordpress -p'${WORDPRESS_DB_PASSWORD:-your-secure-password-here}' -e 'SELECT VERSION();'" 2>/dev/null; then
         success "MySQL接続が正常です"
     else
         error "MySQL接続に失敗しました"

@@ -1,7 +1,7 @@
 {
     "production": {
         "ec2_instance_id": "i-xxxxxxxxxxxxxxxxx",
-        "rds_identifier": "wp-example-rds",
+        "rds_identifier": "wordpress-project-rds",
         "wordpress_url": "https://example.com",
         "backup_retention_days": 7,
         "ssh_user": "ec2-user",
@@ -10,7 +10,7 @@
     },
     "validation": {
         "ec2_instance_id": "i-yyyyyyyyyyyyyyyyy",
-        "rds_identifier": "wp-example-rds-validation",
+        "rds_identifier": "wordpress-project-rds-validation",
         "wordpress_url": "http://validation-ip",
         "test_timeout_minutes": 30,
         "ssh_user": "ec2-user",
