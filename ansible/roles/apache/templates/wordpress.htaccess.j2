@@ -9,3 +9,8 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule . /index.php [L]
 </IfModule>
 # END WordPress
+
+# セキュリティヘッダー
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options nosniff
+    Header alway

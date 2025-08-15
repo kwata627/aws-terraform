@@ -39,9 +39,27 @@
   template:
     src: .htaccess.j2
     dest: /var/www/html/.htaccess
-    mode: '0644'
-    owner: apache
-    group: apache
+    mode: "{{ wp_htaccess_mode }}"
+    owner: "{{ wp_htaccess_owner }}"
+    group: "{{ wp_htaccess_group }}"
+  become: yes
+  notify: restart apache
+
+- name: Set proper permissions for .htaccess file
+  file:
+    path: /var/www/html/.htaccess
+    mode: "0664"
+    owner: "{{ wp_htaccess_owner }}"
+    group: "{{ wp_htaccess_group }}"
+  become: yes
+  notify: restart apache
+
+- name: Ensure .htaccess file is writable by web server
+  file:
+    path: /var/www/html/.htaccess
+    mode: "0664"
+    owner: "{{ wp_htaccess_owner }}"
+    group: "{{ wp_htaccess_group }}"
   become: yes
   notify: restart apache
 
@@ -53,6 +71,14 @@
     owner: apache
     group: apache
     recurse: yes
+  become: yes
+
+- name: Ensure .htaccess directory has correct permissions
+  file:
+    path: /var/www/html
+    mode: '0755'
+    owner: apache
+    group: apache
   become: yes
 
 - name: Set proper permissions for wp-content directory
@@ -74,6 +100,15 @@
     group: apache
     recurse: yes
   become: yes
+
+- name: Ensure .htaccess file has correct permissions for WordPress
+  file:
+    path: /var/www/html/.htaccess
+    mode: "{{ wp_htaccess_mode }}"
+    owner: "{{ wp_htaccess_owner }}"
+    group: "{{ wp_htaccess_group }}"
+  become: yes
+  notify: restart apache
 
 - name: Clean up temporary files
   file:

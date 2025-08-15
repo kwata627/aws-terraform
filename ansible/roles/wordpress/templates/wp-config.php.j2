@@ -73,54 +73,42 @@ $table_prefix = '{{ wp_table_prefix | default('wp_') }}';
 define( 'WP_DEBUG', {{ wp_debug | default(false) | lower }} );
 
 // =============================================================================
-// サイトURL設定（フロントと管理サブドメインを共存させる）
+// サブドメイン完全分離型設定
 // =============================================================================
 
-// フロント用ドメイン
-define('WP_HOME', 'https://{{ wordpress_domain | default("example.com") }}');
+$host = $_SERVER['HTTP_HOST'] ?? '{{ wordpress_domain | default('example.com') }}';
 
-// 管理画面用サブドメイン
-define('WP_SITEURL', 'https://admin.{{ wordpress_domain | default("example.com") }}');
+if ($host === 'admin.{{ wordpress_domain | default('example.com') }}') {
+    // 管理画面専用サブドメイン
+    define('WP_HOME', 'https://admin.{{ wordpress_domain | default('example.com') }}');
+    define('WP_SITEURL', 'https://admin.{{ wordpress_domain | default('example.com') }}');
+} else {
+    // 公開サイト
+    define('WP_HOME', 'https://{{ wordpress_domain | default('example.com') }}');
+    define('WP_SITEURL', 'https://{{ wordpress_domain | default('example.com') }}');
+}
 
-// =============================================================================
-// SSL設定
-// =============================================================================
-define('FORCE_SSL_ADMIN', {{ wp_force_ssl_admin | default(true) | lower }});
-define('FORCE_SSL_LOGIN', {{ wp_force_ssl_login | default(true) | lower }});
+// SSL強制
+define('FORCE_SSL_ADMIN', true);
 
-// =============================================================================
-// キャッシュ設定
-// =============================================================================
-define('WP_CACHE', {{ wp_cache_enabled | default(false) | lower }});
+// 標準の自動更新・編集無効化
+define('AUTOMATIC_UPDATER_DISABLED', true);
+define('DISALLOW_FILE_EDIT', true);
+define('DISALLOW_FILE_MODS', false);
 
-// =============================================================================
-// 言語設定
-// =============================================================================
-define('WPLANG', '{{ wp_lang | default("ja") }}');
-
-// =============================================================================
-// 自動更新・編集制御
-// =============================================================================
-define('AUTOMATIC_UPDATER_DISABLED', {{ wp_automatic_updater_disabled | default(true) | lower }});
-define('DISALLOW_FILE_EDIT', {{ wp_disallow_file_edit | default(true) | lower }});
-define('DISALLOW_FILE_MODS', {{ wp_disallow_file_mods | default(false) | lower }});
-
-// =============================================================================
 // メモリ制限
-// =============================================================================
-define('WP_MEMORY_LIMIT', '{{ wp_memory_limit | default("256M") }}');
-define('WP_MAX_MEMORY_LIMIT', '{{ wp_max_memory_limit | default("512M") }}');
+define('WP_MEMORY_LIMIT', '512M');
+define('WP_MAX_MEMORY_LIMIT', '1024M');
 
-// =============================================================================
-// その他
-// =============================================================================
-define('WP_POST_REVISIONS', {{ wp_post_revisions | default(5) }});
-define('AUTOSAVE_INTERVAL', {{ wp_autosave_interval | default(300) }});
-define('EMPTY_TRASH_DAYS', {{ wp_empty_trash_days | default(30) }});
+// リビジョン・自動保存・ゴミ箱
+define('WP_POST_REVISIONS', 5);
+define('AUTOSAVE_INTERVAL', 300);
+define('EMPTY_TRASH_DAYS', 30);
 
 // =============================================================================
 // 絶対パス
 // =============================================================================
+
 if ( ! defined( 'ABSPATH' ) ) {
     define( 'ABSPATH', __DIR__ . '/' );
 }
@@ -128,4 +116,5 @@ if ( ! defined( 'ABSPATH' ) ) {
 // =============================================================================
 // WordPress 読み込み
 // =============================================================================
-require_once ABSPATH . 'wp-settings.php'; 
+
+require_once ABSPATH . 'wp-settings.php';

@@ -36,4 +36,12 @@
     name: php-fpm
     state: started
     enabled: yes
-  become: yes 
+  become: yes
+
+- name: Configure WordPress-specific PHP settings
+  template:
+    src: wordpress.ini.j2
+    dest: /etc/php.d/wordpress.ini
+    mode: '0644'
+  become: yes
+  notify: restart apache 

@@ -456,6 +456,8 @@ resource "null_resource" "ansible_wordpress_setup" {
     ec2_instance = module.ec2.instance_id
     wordpress_config = filemd5("${path.module}/ansible/roles/wordpress/templates/wp-config.php.j2")
     apache_config = filemd5("${path.module}/ansible/roles/apache/templates/wordpress.conf.j2")
+    htaccess_config = filemd5("${path.module}/ansible/roles/wordpress/templates/.htaccess.j2")
+    apache_htaccess_config = filemd5("${path.module}/ansible/roles/apache/templates/wordpress.htaccess.j2")
     php_config = filemd5("${path.module}/ansible/roles/php/templates/www.conf.j2")
   }
   
