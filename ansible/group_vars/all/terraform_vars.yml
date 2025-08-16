@@ -1,5 +1,11 @@
 domain_name: shamolife.com
 wordpress_domain: shamolife.com
-rds_endpoint: wp-shamo-rds.cjg0emy2snss.ap-northeast-1.rds.amazonaws.com:3306
-s3_bucket_name: wp-shamo-wp-shamo-s3-mf1euyms
-ssh_key_name: wp-shamo-ssh-key
+s3_bucket_name: wp-shamo-s3
+project_name: wp-shamo
+wordpress_url: https://shamolife.com
+wp_db_password: your-db-password
+wp_db_user: your-db-user
+wp_db_name: wordpress
+enable_ssl_setup: true
+enable_lets_encrypt: true
+lets_encrypt_email: wata2watter0903@gmail.com

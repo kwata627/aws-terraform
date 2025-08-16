@@ -5,6 +5,7 @@
     name: httpd
     state: present
   become: yes
+  tags: apache,install
 
 - name: Create Apache configuration directory
   file:
@@ -12,6 +13,7 @@
     state: directory
     mode: '0755'
   become: yes
+  tags: apache,config
 
 - name: Configure Apache virtual host
   template:
@@ -20,6 +22,7 @@
     mode: '0644'
   become: yes
   notify: restart apache
+  tags: apache,config,vhost
 
 - name: Create document root directory
   file:
@@ -29,12 +32,14 @@
     owner: apache
     group: apache
   become: yes
+  tags: apache,config
 
 - name: Remove test index.html if exists
   file:
     path: /var/www/html/index.html
     state: absent
   become: yes
+  tags: apache,config
 
 # HTTPポートを開く（CloudFrontがHTTPSを処理）
 - name: Open HTTP port in firewall
@@ -44,6 +49,7 @@
     state: enabled
   become: yes
   notify: restart firewalld
+  tags: apache,firewall
 
 # HTTPSポートを開く（管理画面用の直接アクセス）
 - name: Open HTTPS port in firewall
@@ -53,6 +59,7 @@
     state: enabled
   become: yes
   notify: restart firewalld
+  tags: apache,firewall
 
 - name: Enable and start Apache service
   service:
@@ -60,6 +67,7 @@
     state: started
     enabled: yes
   become: yes
+  tags: apache,service
 
 - name: Configure Apache to start on boot
   systemd:
@@ -67,6 +75,7 @@
     enabled: yes
     daemon_reload: yes
   become: yes
+  tags: apache,service
 
 # PHP-FPMとの連携設定
 - name: Create backup of mod_php configuration
@@ -77,6 +86,7 @@
   become: yes
   when: ansible_check_mode is not defined
   ignore_errors: yes
+  tags: apache,php-fpm
 
 - name: Disable mod_php configuration
   file:
@@ -84,6 +94,7 @@
     state: absent
   become: yes
   notify: restart apache
+  tags: apache,php-fpm
 
 - name: Ensure mod_proxy_fcgi is enabled
   lineinfile:
@@ -93,6 +104,7 @@
     state: present
   become: yes
   notify: restart apache
+  tags: apache,php-fpm
 
 - name: Ensure mod_rewrite is enabled
   lineinfile:
@@ -102,7 +114,8 @@
     state: present
     create: yes
   become: yes
-  notify: restart apache 
+  notify: restart apache
+  tags: apache,rewrite
 
 - name: Create .htaccess file for wp-admin access control
   template:
@@ -113,5 +126,6 @@
     group: apache
   become: yes
   notify: restart apache
+  tags: apache,security
 
  

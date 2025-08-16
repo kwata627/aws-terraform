@@ -1,7 +1,11 @@
 #!/bin/bash
 
 # =============================================================================
-# WordPress環境構築実行スクリプト
+# Ansible単体実行スクリプト
+# =============================================================================
+# 
+# terraform.tfvarsを直接読み込んでAnsibleを単体実行するスクリプト
+# Terraform出力が取得できない環境でも実行可能
 # =============================================================================
 
 # 共通ライブラリの読み込み
@@ -15,12 +19,12 @@ source "$SCRIPT_DIR/load_env.sh"
 # 定数定義
 # =============================================================================
 
-readonly SCRIPT_NAME="WordPress環境構築"
+readonly SCRIPT_NAME="Ansible単体実行"
 readonly DEFAULT_PLAYBOOK="playbooks/wordpress_setup.yml"
 readonly DEFAULT_INVENTORY="inventory/hosts.yml"
 readonly DEFAULT_ENVIRONMENT="production"
-readonly DEFAULT_TERRAFORM_DIR="../"
 readonly DEFAULT_TERRAFORM_TFVARS="../terraform.tfvars"
+readonly DEFAULT_DEPLOYMENT_CONFIG="../deployment_config.json"
 
 # =============================================================================
 # 関数定義
@@ -29,7 +33,10 @@ readonly DEFAULT_TERRAFORM_TFVARS="../terraform.tfvars"
 # 使用方法の表示
 usage() {
     cat << EOF
-WordPress環境構築実行スクリプト
+Ansible単体実行スクリプト
+
+terraform.tfvarsを直接読み込んでAnsibleを単体実行します。
+Terraform出力が取得できない環境でも実行可能です。
 
 使用方法:
   $0                                    # デフォルト設定で実行
@@ -37,16 +44,16 @@ WordPress環境構築実行スクリプト
   $0 --environment <ENVIRONMENT>         # 指定した環境で実行
   $0 --dry-run                          # ドライラン実行
   $0 --step-by-step                     # 段階的実行
-  $0 --standalone                       # Ansible単体実行モード
   $0 --help                            # このヘルプを表示
 
 機能:
+- terraform.tfvars直接読み込み
+- deployment_config.json読み込み
 - インベントリの自動生成
 - 接続テスト
 - 構文チェック
 - プレイブック実行
 - 環境別設定
-- terraform.tfvars直接読み込み
 
 環境変数:
 - ENVIRONMENT: 環境名 (production/development)
@@ -54,17 +61,54 @@ WordPress環境構築実行スクリプト
 - DRY_RUN: ドライラン実行 (true/false)
 - VERBOSE: 詳細出力 (true/false)
 - LOG_LEVEL: ログレベル (INFO/WARN/ERROR)
-- STANDALONE_MODE: Ansible単体実行モード (true/false)
-- TERRAFORM_DIR: Terraformディレクトリパス
 - TERRAFORM_TFVARS: terraform.tfvarsファイルパス
+- DEPLOYMENT_CONFIG: deployment_config.jsonファイルパス
 
 例:
   $0 --environment production
   $0 --playbook playbooks/step_by_step_setup.yml --dry-run
-  $0 --standalone  # terraform.tfvarsから直接読み込み
   ENVIRONMENT=development $0
 
 EOF
+}
+
+# 設定ファイルの検証
+validate_config_files() {
+    log_step "設定ファイルを検証中..."
+    
+    local terraform_tfvars="${TERRAFORM_TFVARS:-$DEFAULT_TERRAFORM_TFVARS}"
+    local deployment_config="${DEPLOYMENT_CONFIG:-$DEFAULT_DEPLOYMENT_CONFIG}"
+    
+    # terraform.tfvarsの確認
+    if [ -f "$terraform_tfvars" ]; then
+        log_info "terraform.tfvarsファイルを確認しました: $terraform_tfvars"
+        
+        # 基本的な設定値の確認
+        if grep -q "project" "$terraform_tfvars" && grep -q "domain_name" "$terraform_tfvars"; then
+            log_info "terraform.tfvarsの基本設定を確認しました"
+        else
+            log_warn "terraform.tfvarsに必要な設定が不足している可能性があります"
+        fi
+    else
+        log_error "terraform.tfvarsファイルが見つかりません: $terraform_tfvars"
+        log_error "このスクリプトはterraform.tfvarsファイルが必要です"
+        return 1
+    fi
+    
+    # deployment_config.jsonの確認
+    if [ -f "$deployment_config" ]; then
+        if validate_config_file "$deployment_config" "json"; then
+            log_info "deployment_config.jsonファイルを確認しました: $deployment_config"
+        else
+            log_warn "deployment_config.jsonの形式が無効です"
+        fi
+    else
+        log_warn "deployment_config.jsonファイルが見つかりません: $deployment_config"
+        log_info "terraform.tfvarsのみを使用して実行します"
+    fi
+    
+    log_success "設定ファイルの検証が完了しました"
+    return 0
 }
 
 # 環境変数の設定
@@ -85,33 +129,9 @@ setup_environment() {
     # 環境変数の設定
     export ENVIRONMENT="$environment"
     export ANSIBLE_ENVIRONMENT="$environment"
+    export STANDALONE_MODE="true"
     
     log_success "環境設定が完了しました: $environment"
-}
-
-# 設定ファイルの検証
-validate_config_files() {
-    log_step "設定ファイルを検証中..."
-    
-    local terraform_tfvars="${TERRAFORM_TFVARS:-$DEFAULT_TERRAFORM_TFVARS}"
-    local deployment_config="${DEPLOYMENT_CONFIG:-../deployment_config.json}"
-    
-    # terraform.tfvarsの確認
-    if [ -f "$terraform_tfvars" ]; then
-        log_info "terraform.tfvarsファイルを確認しました: $terraform_tfvars"
-    else
-        log_warn "terraform.tfvarsファイルが見つかりません: $terraform_tfvars"
-    fi
-    
-    # deployment_config.jsonの確認
-    if [ -f "$deployment_config" ]; then
-        validate_config_file "$deployment_config" "json"
-        log_info "deployment_config.jsonファイルを確認しました: $deployment_config"
-    else
-        log_warn "deployment_config.jsonファイルが見つかりません: $deployment_config"
-    fi
-    
-    log_success "設定ファイルの検証が完了しました"
 }
 
 # インベントリの準備
@@ -121,20 +141,22 @@ prepare_inventory() {
     # インベントリディレクトリの確認
     check_directory_exists "inventory" "インベントリディレクトリ"
     
-    # 環境変数の設定
-    local standalone_mode="${STANDALONE_MODE:-false}"
-    local terraform_dir="${TERRAFORM_DIR:-$DEFAULT_TERRAFORM_DIR}"
+    # 単体実行モードでインベントリ生成
+    log_info "terraform.tfvarsからインベントリを生成中..."
+    export STANDALONE_MODE="true"
     
-    if [ "$standalone_mode" = "true" ]; then
-        log_info "Ansible単体実行モードでインベントリを生成中..."
-        export STANDALONE_MODE="true"
+    if [ -f "generate_inventory.py" ]; then
+        python3 generate_inventory.py
+        if [ $? -eq 0 ]; then
+            log_success "インベントリの生成が完了しました"
+        else
+            log_error "インベントリの生成に失敗しました"
+            return 1
+        fi
     else
-        log_info "Terraform連携モードでインベントリを生成中..."
-        export TERRAFORM_DIR="$terraform_dir"
+        log_error "generate_inventory.pyが見つかりません"
+        return 1
     fi
-    
-    # インベントリ生成スクリプトの実行
-    generate_inventory
     
     # 生成されたインベントリファイルの確認
     check_inventory "$DEFAULT_INVENTORY"
@@ -146,17 +168,8 @@ prepare_inventory() {
 prepare_variables() {
     log_step "Ansible変数を準備中..."
     
-    # 環境変数の設定
-    local standalone_mode="${STANDALONE_MODE:-false}"
-    local terraform_dir="${TERRAFORM_DIR:-$DEFAULT_TERRAFORM_DIR}"
-    
-    if [ "$standalone_mode" = "true" ]; then
-        log_info "Ansible単体実行モードで変数を生成中..."
-        export STANDALONE_MODE="true"
-    else
-        log_info "Terraform連携モードで変数を生成中..."
-        export TERRAFORM_DIR="$terraform_dir"
-    fi
+    log_info "terraform.tfvarsからAnsible変数を生成中..."
+    export STANDALONE_MODE="true"
     
     # 変数生成スクリプトの実行
     if [ -f "scripts/load_terraform_vars.py" ]; then
@@ -171,24 +184,6 @@ prepare_variables() {
     fi
 }
 
-# インベントリ生成
-generate_inventory() {
-    log_step "インベントリを生成中..."
-    
-    if [ -f "generate_inventory.py" ]; then
-        python3 generate_inventory.py
-        if [ $? -eq 0 ]; then
-            log_success "インベントリの生成が完了しました"
-        else
-            log_error "インベントリの生成に失敗しました"
-            return 1
-        fi
-    else
-        log_error "generate_inventory.pyが見つかりません"
-        return 1
-    fi
-}
-
 # インベントリの確認
 check_inventory() {
     local inventory_file="$1"
@@ -200,13 +195,10 @@ check_inventory() {
     
     log_info "インベントリファイルを確認しました: $inventory_file"
     
-    # インベントリの構文チェック
+    # インベントリの内容を表示
     if command -v ansible-inventory >/dev/null 2>&1; then
-        if ansible-inventory --list -i "$inventory_file" >/dev/null 2>&1; then
-            log_info "インベントリの構文チェックが完了しました"
-        else
-            log_warn "インベントリの構文チェックで警告が発生しました"
-        fi
+        log_info "インベントリの内容:"
+        ansible-inventory --list -i "$inventory_file" 2>/dev/null | head -20
     fi
     
     return 0
@@ -233,7 +225,7 @@ test_connections() {
             log_success "接続テストが完了しました"
         else
             log_warn "接続テストで一部のホストに接続できませんでした"
-            log_info "設定を確認してから再実行してください"
+            log_info "IPアドレスが正しく設定されているか確認してください"
             return 1
         fi
     else
@@ -316,6 +308,30 @@ test_environment() {
     fi
 }
 
+# 設定情報の表示
+show_config_info() {
+    log_step "設定情報を表示中..."
+    
+    local terraform_tfvars="${TERRAFORM_TFVARS:-$DEFAULT_TERRAFORM_TFVARS}"
+    local deployment_config="${DEPLOYMENT_CONFIG:-$DEFAULT_DEPLOYMENT_CONFIG}"
+    
+    echo ""
+    echo "=== 設定情報 ==="
+    echo "terraform.tfvars: $terraform_tfvars"
+    echo "deployment_config.json: $deployment_config"
+    echo "実行モード: 単体実行（terraform.tfvars直接読み込み）"
+    echo ""
+    
+    # terraform.tfvarsの主要設定を表示
+    if [ -f "$terraform_tfvars" ]; then
+        echo "terraform.tfvarsの主要設定:"
+        grep -E "^(project|environment|domain_name|ec2_name|rds_identifier)" "$terraform_tfvars" | head -10
+        echo ""
+    fi
+    
+    log_success "設定情報の表示が完了しました"
+}
+
 # メイン処理
 main() {
     # 引数の解析
@@ -323,7 +339,6 @@ main() {
     local environment="$DEFAULT_ENVIRONMENT"
     local dry_run="false"
     local step_by_step="false"
-    local standalone_mode="false"
     
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -343,10 +358,6 @@ main() {
                 step_by_step="true"
                 shift
                 ;;
-            --standalone)
-                standalone_mode="true"
-                shift
-                ;;
             --help)
                 usage
                 exit 0
@@ -359,21 +370,24 @@ main() {
         esac
     done
     
-    # 環境変数の設定
-    export STANDALONE_MODE="$standalone_mode"
-    
     log_info "=== $SCRIPT_NAME 開始 ==="
     log_info "プレイブック: $playbook"
     log_info "環境: $environment"
     log_info "ドライラン: $dry_run"
     log_info "段階的実行: $step_by_step"
-    log_info "単体実行モード: $standalone_mode"
+    log_info "実行モード: 単体実行（terraform.tfvars直接読み込み）"
+    
+    # 設定情報の表示
+    show_config_info
+    
+    # 設定ファイルの検証
+    if ! validate_config_files; then
+        log_error "設定ファイルの検証に失敗しました"
+        exit 1
+    fi
     
     # 環境設定
     setup_environment "$environment"
-    
-    # 設定ファイルの検証
-    validate_config_files
     
     # インベントリの準備
     if ! prepare_inventory; then
@@ -387,6 +401,7 @@ main() {
     # 接続テスト
     if ! test_connections "$DEFAULT_INVENTORY"; then
         log_warn "接続テストに失敗しましたが、処理を続行します"
+        log_info "IPアドレスが正しく設定されているか確認してください"
     fi
     
     # プレイブック実行
@@ -399,9 +414,12 @@ main() {
     test_environment "$DEFAULT_INVENTORY"
     
     log_success "=== $SCRIPT_NAME 完了 ==="
+    echo ""
+    echo "Ansible単体実行が完了しました"
+    echo "terraform.tfvarsから直接設定値を読み込んで実行しました"
 }
 
 # スクリプト実行
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
-fi 
+fi

@@ -1,13 +1,17 @@
 {
     "production": {
         "ec2_instance_id": "i-1234567890abcdef0",
+        "ec2_public_ip": "54.64.49.220",
+        "nat_instance_ip": "54.64.109.28",
         "rds_identifier": "wp-shamo-rds",
         "wordpress_url": "http://shamonooyuuhan.com",
-        "db_password": "test_production_password",
+        "db_password": "breadhouse",
         "backup_retention_days": 7
     },
     "validation": {
         "ec2_instance_id": "i-0987654321fedcba0",
+        "ec2_public_ip": "203.0.113.20",
+        "nat_instance_ip": "203.0.113.21",
         "rds_identifier": "wp-shamo-rds-validation",
         "wordpress_url": "http://validation-ip",
         "db_password": "test_validation_password",

@@ -40,10 +40,10 @@ wordpress:
   apache_group: "{{ APACHE_GROUP | default('apache') }}"
   
   # PHP設定
-  php_memory_limit: "{{ PHP_MEMORY_LIMIT | default('256M') }}"
+  php_memory_limit: "{{ PHP_MEMORY_LIMIT | default('512M') }}"
   php_max_execution_time: "{{ PHP_MAX_EXECUTION_TIME | default(300) | int }}"
-  php_upload_max_filesize: "{{ PHP_UPLOAD_MAX_FILESIZE | default('64M') }}"
-  php_post_max_size: "{{ PHP_POST_MAX_SIZE | default('64M') }}"
+  php_upload_max_filesize: "{{ PHP_UPLOAD_MAX_FILESIZE | default('256M') }}"
+  php_post_max_size: "{{ PHP_POST_MAX_SIZE | default('512M') }}"
   php_date_timezone: "{{ PHP_DATE_TIMEZONE | default('Asia/Tokyo') }}"
   
   # セキュリティ設定

@@ -1,6 +1,6 @@
 ---
 # WordPressサーバー用変数
-wordpress_domain: "{{ lookup('env', 'WORDPRESS_DOMAIN') | default(lookup('env', 'DOMAIN_NAME') | default('example.com')) }}"
+wordpress_domain: "{{ wordpress_domain | default('shamolife.com') }}"
 wordpress_locale: ja
 wordpress_language: ja
 
@@ -17,10 +17,10 @@ apache_user: apache
 apache_group: apache
 
 # PHP設定
-php_memory_limit: 256M
+php_memory_limit: 512M
 php_max_execution_time: 300
-php_upload_max_filesize: 64M
-php_post_max_size: 64M
+php_upload_max_filesize: 256M
+php_post_max_size: 512M
 php_date_timezone: Asia/Tokyo
 
 # セキュリティ設定

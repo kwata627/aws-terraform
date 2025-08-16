@@ -13,6 +13,7 @@
       - php8.4-fpm
     state: present
   become: yes
+  tags: php,install
 
 - name: Configure PHP settings
   template:
@@ -21,6 +22,7 @@
     mode: '0644'
   become: yes
   notify: restart apache
+  tags: php,config
 
 - name: Configure PHP-FPM settings (if needed)
   template:
@@ -30,6 +32,7 @@
   become: yes
   when: php_fpm_enabled | default(false)
   notify: restart php-fpm
+  tags: php,config,php-fpm
 
 - name: Enable and start PHP-FPM
   service:
@@ -37,6 +40,7 @@
     state: started
     enabled: yes
   become: yes
+  tags: php,service
 
 - name: Configure WordPress-specific PHP settings
   template:
@@ -44,4 +48,5 @@
     dest: /etc/php.d/wordpress.ini
     mode: '0644'
   become: yes
-  notify: restart apache 
+  notify: restart apache
+  tags: php,config,wordpress 

@@ -22,7 +22,7 @@
     SSLCertificateKeyFile /etc/letsencrypt/live/{{ wordpress_domain | default('example.com') }}/privkey.pem
 
     # クライアントリクエストサイズ制限（管理画面はより大きな制限）
-    LimitRequestBody 1073741824
+    LimitRequestBody 2147483648
     LimitRequestFieldSize 16384
     LimitRequestLine 8190
 
@@ -34,6 +34,11 @@
         php_value max_input_time 300
         php_value memory_limit 512M
     </IfModule>
+
+    # PHP-FPM設定
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php-fpm/www.sock|fcgi://localhost"
+    </FilesMatch>
 
     <Directory /var/www/html>
         AllowOverride All
@@ -93,6 +98,20 @@
     LimitRequestBody 268435456
     LimitRequestFieldSize 16384
     LimitRequestLine 8190
+
+    # PHP設定（公開サイト）
+    <IfModule mod_php.c>
+        php_value upload_max_filesize 256M
+        php_value post_max_size 512M
+        php_value max_execution_time 300
+        php_value max_input_time 300
+        php_value memory_limit 512M
+    </IfModule>
+
+    # PHP-FPM設定
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php-fpm/www.sock|fcgi://localhost"
+    </FilesMatch>
 
     <Directory /var/www/html>
         AllowOverride All

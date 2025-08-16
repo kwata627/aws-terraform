@@ -1,10 +1,10 @@
 [PHP]
 ; 基本設定
-memory_limit = {{ php_memory_limit | default('256M') }}
+memory_limit = {{ php_memory_limit | default('512M') }}
 max_execution_time = {{ php_max_execution_time | default('300') }}
 max_input_time = {{ php_max_input_time | default('300') }}
-post_max_size = {{ php_post_max_size | default('64M') }}
-upload_max_filesize = {{ php_upload_max_filesize | default('64M') }}
+post_max_size = {{ php_post_max_size | default('512M') }}
+upload_max_filesize = {{ php_upload_max_filesize | default('256M') }}
 
 ; エラー設定
 display_errors = {{ php_display_errors | default('Off') }}
