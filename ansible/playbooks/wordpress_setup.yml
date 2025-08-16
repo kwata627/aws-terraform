@@ -33,6 +33,8 @@
 - name: Setup WordPress environment
   hosts: wordpress
   become: yes
+  vars_files:
+    - ../group_vars/all/terraform_vars.yml
   vars:
     # データベース設定
     wp_db_name: wordpress
@@ -40,7 +42,7 @@
     wp_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password') }}"
     
     # WordPress設定（domain_nameとwordpress_domainを統一）
-    wordpress_domain: "{{ lookup('env', 'WORDPRESS_DOMAIN') | default(lookup('env', 'DOMAIN_NAME') | default('example.com')) }}"
+    wordpress_domain: "{{ domain_name | default('example.com') }}"
     
     # SSH設定
     ssh_private_key: "{{ lookup('env', 'SSH_PRIVATE_KEY_PATH') | default('~/.ssh/ssh_key') }}"

@@ -12,7 +12,9 @@ wp_debug: false
 wp_lang: "ja"
 
 # ドメイン設定
-wordpress_domain: "{{ lookup('env', 'WORDPRESS_DOMAIN') | default(lookup('env', 'DOMAIN_NAME') | default('example.com')) }}"
+wordpress_domain: "{{ domain_name | default('example.com') }}"
+wordpress_locale: ja
+wordpress_language: ja
 
 # SSL設定
 wp_force_ssl_admin: true

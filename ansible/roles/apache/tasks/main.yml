@@ -61,22 +61,6 @@
   notify: restart firewalld
   tags: apache,firewall
 
-- name: Enable and start Apache service
-  service:
-    name: httpd
-    state: started
-    enabled: yes
-  become: yes
-  tags: apache,service
-
-- name: Configure Apache to start on boot
-  systemd:
-    name: httpd
-    enabled: yes
-    daemon_reload: yes
-  become: yes
-  tags: apache,service
-
 # PHP-FPMとの連携設定
 - name: Create backup of mod_php configuration
   copy:
@@ -127,5 +111,22 @@
   become: yes
   notify: restart apache
   tags: apache,security
+
+# Apache起動は設定完了後に実行
+- name: Enable and start Apache service
+  service:
+    name: httpd
+    state: started
+    enabled: yes
+  become: yes
+  tags: apache,service
+
+- name: Configure Apache to start on boot
+  systemd:
+    name: httpd
+    enabled: yes
+    daemon_reload: yes
+  become: yes
+  tags: apache,service
 
  

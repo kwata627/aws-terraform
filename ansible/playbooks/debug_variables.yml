@@ -1,0 +1,35 @@
+---
+# 変数デバッグプレイブック
+- name: Debug Variables
+  hosts: wordpress
+  gather_facts: yes
+  become: no
+  
+  tasks:
+    - name: Display all hostvars
+      debug:
+        var: hostvars[inventory_hostname]
+    
+    - name: Display all variables for this host
+      debug:
+        var: vars
+    
+    - name: Display group_vars
+      debug:
+        var: group_names
+    
+    - name: Test variable resolution with default
+      debug:
+        msg: "domain_name with default: {{ domain_name | default('NOT_FOUND') }}"
+    
+    - name: Test wordpress_domain resolution
+      debug:
+        msg: "wordpress_domain: {{ wordpress_domain | default('NOT_FOUND') }}"
+    
+    - name: Display environment variables
+      debug:
+        msg: "WORDPRESS_DOMAIN: {{ lookup('env', 'WORDPRESS_DOMAIN') | default('NOT_SET') }}"
+    
+    - name: Display environment variables
+      debug:
+        msg: "DOMAIN_NAME: {{ lookup('env', 'DOMAIN_NAME') | default('NOT_SET') }}"

@@ -4,7 +4,7 @@
   hosts: wordpress
   become: yes
   vars:
-    wordpress_domain: "{{ lookup('env', 'WORDPRESS_DOMAIN') | default(lookup('env', 'DOMAIN_NAME') | default('example.com')) }}"
+    wordpress_domain: "{{ domain_name | default('example.com') }}"
     cloudfront_domain: "{{ lookup('env', 'CLOUDFRONT_DOMAIN') | default('') }}"
   
   tasks:

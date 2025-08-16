@@ -1,6 +1,6 @@
 ---
 # WordPressサーバー用変数
-wordpress_domain: "{{ wordpress_domain | default('shamolife.com') }}"
+wordpress_domain: "{{ domain_name | default('example.com') }}"
 wordpress_locale: ja
 wordpress_language: ja
 

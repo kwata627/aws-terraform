@@ -1,6 +1,6 @@
 ---
 # Apacheロールのデフォルト変数
-wordpress_domain: "{{ lookup('env', 'WORDPRESS_DOMAIN') | default(lookup('env', 'DOMAIN_NAME') | default('example.com')) }}"
+wordpress_domain: "{{ domain_name | default('example.com') }}"
 apache_user: apache
 apache_group: apache
 document_root: /var/www/html

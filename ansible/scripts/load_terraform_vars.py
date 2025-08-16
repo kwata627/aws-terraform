@@ -243,6 +243,14 @@ def merge_configurations(
             elif isinstance(rds_output, str):
                 merged_config['rds_endpoint'] = rds_output
         
+        # RDS Username
+        if 'db_username' in terraform_output:
+            db_username_output = terraform_output['db_username']
+            if isinstance(db_username_output, dict) and 'value' in db_username_output:
+                merged_config['wp_db_user'] = db_username_output['value']
+            elif isinstance(db_username_output, str):
+                merged_config['wp_db_user'] = db_username_output
+        
         # SSH Key Name
         if 'ssh_key_name' in terraform_output:
             ssh_output = terraform_output['ssh_key_name']
@@ -341,12 +349,19 @@ def convert_terraform_to_ansible_vars(config: Dict[str, Any]) -> Dict[str, Any]:
         ansible_vars['wp_db_password'] = config['db_password']
         logger.info("データベースパスワードを設定")
     
-    if 'db_user' in config:
+    # データベースユーザー名（TerraformのRDSモジュールのデフォルト値を使用）
+    if 'wp_db_user' in config:
+        ansible_vars['wp_db_user'] = config['wp_db_user']
+        logger.info(f"データベースユーザーを設定: {config['wp_db_user']}")
+    elif 'db_username' in config:
+        ansible_vars['wp_db_user'] = config['db_username']
+        logger.info(f"データベースユーザーを設定: {config['db_username']}")
+    elif 'db_user' in config:
         ansible_vars['wp_db_user'] = config['db_user']
         logger.info(f"データベースユーザーを設定: {config['db_user']}")
     else:
-        ansible_vars['wp_db_user'] = 'wordpress'
-        logger.info("データベースユーザーをデフォルト値に設定: wordpress")
+        ansible_vars['wp_db_user'] = 'admin'  # RDSモジュールのデフォルト値
+        logger.info("データベースユーザーをデフォルト値に設定: admin")
     
     if 'db_name' in config:
         ansible_vars['wp_db_name'] = config['db_name']
