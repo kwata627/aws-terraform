@@ -1,5 +1,5 @@
 # =============================================================================
-# Terraform Variables Configuration (Refactored)
+# Terraform Variables Configuration (Optimized)
 # =============================================================================
 # 
 # このファイルはTerraform変数の設定値を含みます。
@@ -93,6 +93,15 @@ validation_rds_snapshot_identifier = ""
 ssh_allowed_cidr = "0.0.0.0/0"
 
 # -----------------------------------------------------------------------------
+# SSL/TLS Configuration (Let's Encrypt)
+# -----------------------------------------------------------------------------
+
+enable_ssl_setup = true
+enable_lets_encrypt = true
+lets_encrypt_email = "wata2watter0903@gmail.com"
+lets_encrypt_staging = false  # 本番環境ではfalse
+
+# -----------------------------------------------------------------------------
 # Additional Tags
 # -----------------------------------------------------------------------------
 
@@ -104,17 +113,3 @@ tags = {
   Monitoring  = "enabled"
 }
 
-# -----------------------------------------------------------------------------
-# SSL/TLS Configuration (Let's Encrypt)
-# -----------------------------------------------------------------------------
-
-enable_ssl_setup = true
-enable_lets_encrypt = true
-lets_encrypt_email = "wata2watter0903@gmail.com"
-lets_encrypt_staging = false  # 本番環境ではfalse
-
-# -----------------------------------------------------------------------------
-# CloudFront Configuration
-# -----------------------------------------------------------------------------
-
-enable_cloudfront = false  # CloudFront機能を無効化

@@ -1,5 +1,5 @@
 # =============================================================================
-# Main Terraform Configuration - Local Values
+# Main Terraform Configuration - Local Values (Optimized)
 # =============================================================================
 # 
 # このファイルはメインTerraform設定のローカル値定義を含みます。
@@ -7,9 +7,6 @@
 # =============================================================================
 
 locals {
-  # CloudFront IPアドレスリストの読み込みを削除（CloudFront機能を無効化）
-  # cloudfront_ips = split("\n", trimspace(file("${path.module}/cloudfront_ips_latest.txt")))
-  
   # 共通タグ
   common_tags = merge(
     {
@@ -28,8 +25,7 @@ locals {
     profile = var.aws_profile
   }
   
-  # 自動リソース名生成
-  # 手動で値が指定された場合はその値を使用し、空の場合はproject名をprefixとして使用
+  # 自動リソース名生成（効率化）
   resource_names = {
     # EC2関連
     ec2_name = coalesce(var.ec2_name, "${var.project}-ec2")
@@ -41,16 +37,6 @@ locals {
     
     # S3関連
     s3_bucket_name = coalesce(var.s3_bucket_name, "${var.project}-s3")
-    
-    # セキュリティグループ関連
-    sg_wordpress = "${var.project}-sg-wordpress"
-    sg_rds = "${var.project}-sg-rds"
-    sg_nat = "${var.project}-sg-nat"
-    sg_alb = "${var.project}-sg-alb"
-    
-    # その他
-    key_pair_name = "${var.project}-key"
-    nat_instance_name = "${var.project}-nat"
   }
   
   # ネットワーク設定
@@ -74,7 +60,7 @@ locals {
     ]
   }
   
-  # セキュリティルール設定
+  # セキュリティルール設定（必要最小限）
   security_rules = {
     ssh = {
       enabled       = true
@@ -121,11 +107,11 @@ locals {
       allowed_cidrs = ["0.0.0.0/0"]
     }
     alb_http = {
-      enabled       = true
+      enabled       = false
       allowed_cidrs = ["0.0.0.0/0"]
     }
     alb_https = {
-      enabled       = true
+      enabled       = false
       allowed_cidrs = ["0.0.0.0/0"]
     }
     redis = {
@@ -172,56 +158,45 @@ locals {
     registrant_info = var.registrant_info
   }
   
-  # セキュリティ機能設定
-  security_features = {
-    enable_security_audit = false
-    enable_security_monitoring = false
-    enable_security_automation = false
-    enable_security_compliance = false
-  }
-  
-  # ネットワーク機能設定
-  network_features = {
-    enable_network_acls = false
-    enable_vpc_endpoints = false
-    enable_flow_logs = false
-    enable_nat_route = true
-  }
-  
-  # RDS機能設定
-  rds_features = {
-    deletion_protection = false
-    storage_encrypted = true
-    publicly_accessible = false
-    multi_az = false
-    enable_cloudwatch_logs = false
-    enable_performance_insights = false
-    enable_enhanced_monitoring = false
-  }
-  
-  # S3機能設定
-  s3_features = {
-    enable_versioning = true
-    encryption_algorithm = "AES256"
-    enable_bucket_key = true
-    block_public_acls = true
-    block_public_policy = true
-    ignore_public_acls = true
-    restrict_public_buckets = true
-    object_ownership = "BucketOwnerEnforced"
-    bucket_acl = null
-    enable_lifecycle_management = true
-    enable_access_logging = false
-    enable_inventory = false
-    enable_intelligent_tiering = false
-  }
-  
-  # Route53機能設定
-  route53_features = {
-    enable_dnssec = false
-    enable_query_logging = false
-    enable_health_checks = false
-    is_private_zone = false
-    private_zone_vpc_ids = []
+  # 機能設定（必要最小限に統合）
+  features = {
+    # セキュリティ機能
+    security_audit = false
+    security_monitoring = false
+    security_automation = false
+    security_compliance = false
+    
+    # ネットワーク機能
+    network_acls = false
+    vpc_endpoints = false
+    flow_logs = false
+    nat_route = true
+    
+    # RDS機能
+    rds_deletion_protection = false
+    rds_storage_encrypted = true
+    rds_publicly_accessible = false
+    rds_multi_az = false
+    rds_cloudwatch_logs = false
+    rds_performance_insights = false
+    rds_enhanced_monitoring = false
+    
+    # S3機能
+    s3_versioning = true
+    s3_encryption_algorithm = "AES256"
+    s3_bucket_key = true
+    s3_public_access_blocked = true
+    s3_object_ownership = "BucketOwnerEnforced"
+    s3_lifecycle_management = true
+    s3_access_logging = false
+    s3_inventory = false
+    s3_intelligent_tiering = false
+    
+    # Route53機能
+    route53_dnssec = false
+    route53_query_logging = false
+    route53_health_checks = false
+    route53_private_zone = false
+    route53_private_zone_vpc_ids = []
   }
 } 

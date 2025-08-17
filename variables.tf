@@ -1,5 +1,5 @@
 # =============================================================================
-# Main Terraform Variables (Refactored)
+# Main Terraform Variables (Optimized)
 # =============================================================================
 # 
 # このファイルはメインTerraform設定の変数定義を含みます。
@@ -118,17 +118,6 @@ variable "az1" {
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.az1))
     error_message = "有効なアベイラビリティゾーンを指定してください。"
-  }
-}
-
-variable "enable_ssl_setup" {
-  description = "SSL設定の自動実行を有効にするかどうか"
-  type        = bool
-  default     = false
-  
-  validation {
-    condition     = contains([true, false], var.enable_ssl_setup)
-    error_message = "enable_ssl_setupは true または false である必要があります。"
   }
 }
 
@@ -350,47 +339,19 @@ variable "ssh_allowed_cidr" {
 }
 
 # -----------------------------------------------------------------------------
-# Additional Tags
-# -----------------------------------------------------------------------------
-
-variable "tags" {
-  description = "追加のタグ"
-  type        = map(string)
-  default     = {}
-  
-  validation {
-    condition = alltrue([
-      for key, value in var.tags : 
-      length(key) > 0 && length(key) <= 128 &&
-      length(value) <= 256
-    ])
-    error_message = "タグのキーは1-128文字、値は256文字以内である必要があります。"
-  }
-}
-
-# -----------------------------------------------------------------------------
-# CloudFront Configuration
-# -----------------------------------------------------------------------------
-
-variable "enable_cloudfront" {
-  description = "CloudFrontディストリビューションの有効化"
-  type        = bool
-  default     = false  # CloudFront機能を無効化
-}
-
-# -----------------------------------------------------------------------------
-# DNS Management Configuration
-# -----------------------------------------------------------------------------
-
-variable "auto_update_nameservers" {
-  description = "ドメインのネームサーバーを自動更新するかどうか"
-  type        = bool
-  default     = true
-}
-
-# -----------------------------------------------------------------------------
 # SSL/TLS Configuration (Let's Encrypt)
 # -----------------------------------------------------------------------------
+
+variable "enable_ssl_setup" {
+  description = "SSL設定の自動実行を有効にするかどうか"
+  type        = bool
+  default     = false
+  
+  validation {
+    condition     = contains([true, false], var.enable_ssl_setup)
+    error_message = "enable_ssl_setupは true または false である必要があります。"
+  }
+}
 
 variable "enable_lets_encrypt" {
   description = "Let's Encrypt証明書の自動取得を有効にするかどうか"
@@ -422,6 +383,25 @@ variable "lets_encrypt_staging" {
   validation {
     condition     = contains([true, false], var.lets_encrypt_staging)
     error_message = "lets_encrypt_stagingは true または false である必要があります。"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Additional Tags
+# -----------------------------------------------------------------------------
+
+variable "tags" {
+  description = "追加のタグ"
+  type        = map(string)
+  default     = {}
+  
+  validation {
+    condition = alltrue([
+      for key, value in var.tags : 
+      length(key) > 0 && length(key) <= 128 &&
+      length(value) <= 256
+    ])
+    error_message = "タグのキーは1-128文字、値は256文字以内である必要があります。"
   }
 }
 

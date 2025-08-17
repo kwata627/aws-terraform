@@ -79,12 +79,12 @@ module "network" {
   
   # NATインスタンス設定
   nat_instance_network_interface_id = module.nat_instance.nat_instance_network_interface_id
-  enable_nat_route = local.network_features.enable_nat_route
+  enable_nat_route = local.features.nat_route
   
   # セキュリティ設定
-  enable_network_acls = local.network_features.enable_network_acls
-  enable_vpc_endpoints = local.network_features.enable_vpc_endpoints
-  enable_flow_logs = local.network_features.enable_flow_logs
+  enable_network_acls = local.features.network_acls
+  enable_vpc_endpoints = local.features.vpc_endpoints
+  enable_flow_logs = local.features.flow_logs
   
   # 環境設定
   environment = local.environment_config.name
@@ -114,10 +114,10 @@ module "security" {
   enable_cloudfront_access = false
   
   # セキュリティ機能設定
-  enable_security_audit = local.security_features.enable_security_audit
-  enable_security_monitoring = local.security_features.enable_security_monitoring
-  enable_security_automation = local.security_features.enable_security_automation
-  enable_security_compliance = local.security_features.enable_security_compliance
+  enable_security_audit = local.features.security_audit
+  enable_security_monitoring = local.features.security_monitoring
+  enable_security_automation = local.features.security_automation
+  enable_security_compliance = local.features.security_compliance
   
   # 環境設定
   environment = local.environment_config.name
@@ -165,10 +165,10 @@ module "rds" {
   rds_identifier = local.rds_config.rds_identifier
   
   # セキュリティ設定
-  deletion_protection = local.rds_features.deletion_protection
-  storage_encrypted = local.rds_features.storage_encrypted
-  publicly_accessible = local.rds_features.publicly_accessible
-  multi_az = local.rds_features.multi_az
+  deletion_protection = local.features.rds_deletion_protection
+  storage_encrypted = local.features.rds_storage_encrypted
+  publicly_accessible = local.features.rds_publicly_accessible
+  multi_az = local.features.rds_multi_az
   
   # バックアップ設定
   backup_retention_period = 7
@@ -176,9 +176,9 @@ module "rds" {
   maintenance_window = "sun:04:00-sun:05:00"
   
   # 監視・ログ設定
-  enable_cloudwatch_logs = local.rds_features.enable_cloudwatch_logs
-  enable_performance_insights = local.rds_features.enable_performance_insights
-  enable_enhanced_monitoring = local.rds_features.enable_enhanced_monitoring
+  enable_cloudwatch_logs = local.features.rds_cloudwatch_logs
+  enable_performance_insights = local.features.rds_performance_insights
+  enable_enhanced_monitoring = local.features.rds_enhanced_monitoring
   
   # 検証環境設定
   enable_validation_rds = local.rds_config.enable_validation_rds
@@ -204,20 +204,20 @@ module "s3" {
   bucket_purpose = local.s3_config.bucket_purpose
   
   # セキュリティ設定
-  enable_versioning = local.s3_features.enable_versioning
-  encryption_algorithm = local.s3_features.encryption_algorithm
-  enable_bucket_key = local.s3_features.enable_bucket_key
+  enable_versioning = local.features.s3_versioning
+  encryption_algorithm = local.features.s3_encryption_algorithm
+  enable_bucket_key = local.features.s3_bucket_key
   
   # パブリックアクセス制御
-  block_public_acls = local.s3_features.block_public_acls
-  block_public_policy = local.s3_features.block_public_policy
-  ignore_public_acls = local.s3_features.ignore_public_acls
-  restrict_public_buckets = local.s3_features.restrict_public_buckets
-  object_ownership = local.s3_features.object_ownership
-  bucket_acl = local.s3_features.bucket_acl
+  block_public_acls = local.features.s3_public_access_blocked
+  block_public_policy = local.features.s3_public_access_blocked
+  ignore_public_acls = local.features.s3_public_access_blocked
+  restrict_public_buckets = local.features.s3_public_access_blocked
+  object_ownership = local.features.s3_object_ownership
+  bucket_acl = null
   
   # ライフサイクル管理
-  enable_lifecycle_management = local.s3_features.enable_lifecycle_management
+  enable_lifecycle_management = local.features.s3_lifecycle_management
   noncurrent_version_transition_days = 30
   noncurrent_version_storage_class = "STANDARD_IA"
   noncurrent_version_expiration_days = 90
@@ -225,14 +225,11 @@ module "s3" {
   enable_object_expiration = false
   
   # 監視・ログ設定
-  enable_access_logging = local.s3_features.enable_access_logging
-  enable_inventory = local.s3_features.enable_inventory
+  enable_access_logging = local.features.s3_access_logging
+  enable_inventory = local.features.s3_inventory
   
   # インテリジェントティアリング
-  enable_intelligent_tiering = local.s3_features.enable_intelligent_tiering
-  
-  # CloudFront統合（削除）
-  # cloudfront_distribution_arn = module.cloudfront.distribution_arn
+  enable_intelligent_tiering = local.features.s3_intelligent_tiering
   
   # タグ設定
   tags = local.common_tags
@@ -300,15 +297,15 @@ module "route53" {
   domain_registered = local.domain_registered
   
   # セキュリティ設定
-  enable_dnssec = local.route53_features.enable_dnssec
-  enable_query_logging = local.route53_features.enable_query_logging
+  enable_dnssec = local.features.route53_dnssec
+  enable_query_logging = local.features.route53_query_logging
   
   # ヘルスチェック設定
-  enable_health_checks = local.route53_features.enable_health_checks
+  enable_health_checks = local.features.route53_health_checks
   
   # プライベートホストゾーン設定
-  is_private_zone = local.route53_features.is_private_zone
-  private_zone_vpc_ids = local.route53_features.private_zone_vpc_ids
+  is_private_zone = local.features.route53_private_zone
+  private_zone_vpc_ids = local.features.route53_private_zone_vpc_ids
   
   # 環境設定
   environment = local.environment_config.name
