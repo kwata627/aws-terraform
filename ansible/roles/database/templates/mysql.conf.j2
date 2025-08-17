@@ -1,8 +1,9 @@
 [client]
-host={{ wordpress_db_host }}
-user={{ wordpress_db_user }}
-password={{ wordpress_db_password }}
-database={{ wordpress_db_name }}
+host={{ wp_db_host | default(rds_host) | default('localhost') }}
+port={{ wp_db_port | default(rds_port) | default('3306') }}
+user={{ wp_db_user | default('admin') }}
+password={{ wp_db_password | default('password') }}
+database={{ wp_db_name | default('wordpress') }}
 
 [mysql]
 default-character-set=utf8mb4

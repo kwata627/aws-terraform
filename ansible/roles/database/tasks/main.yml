@@ -61,11 +61,11 @@
 
 - name: Test database connection
   mysql_query:
-    login_db: "{{ wordpress_db_name }}"
-    login_host: "{{ rds_host | default(wordpress_db_host) }}"
-    login_port: "{{ rds_port | default('3306') }}"
-    login_user: "{{ wordpress_db_user }}"
-    login_password: "{{ wordpress_db_password }}"
+    login_db: "{{ wp_db_name | default('wordpress') }}"
+    login_host: "{{ wp_db_host | default(rds_host) | default('localhost') }}"
+    login_port: "{{ wp_db_port | default(rds_port) | default('3306') }}"
+    login_user: "{{ wp_db_user | default('admin') }}"
+    login_password: "{{ wp_db_password | default('password') }}"
     query: "SELECT 1"
   register: db_test
   ignore_errors: yes
@@ -79,9 +79,10 @@
   debug:
     msg: |
       RDS Endpoint: {{ rds_endpoint | default('Not set') }}
-      Database Host: {{ wordpress_db_host | default('Not set') }}
-      Database Name: {{ wordpress_db_name | default('Not set') }}
-      Database User: {{ wordpress_db_user | default('Not set') }}
+      Database Host: {{ wp_db_host | default(rds_host) | default('localhost') }}
+      Database Port: {{ wp_db_port | default(rds_port) | default('3306') }}
+      Database Name: {{ wp_db_name | default('wordpress') }}
+      Database User: {{ wp_db_user | default('admin') }}
     verbosity: 1
 
  

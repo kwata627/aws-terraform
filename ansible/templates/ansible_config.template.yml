@@ -28,11 +28,11 @@ wordpress:
   wordpress_domain: "{{ WORDPRESS_DOMAIN | default(ansible_default_ipv4.address) }}"
   
   # データベース設定
-  wordpress_db_host: "{{ WORDPRESS_DB_HOST | default('localhost') }}"
-  wordpress_db_name: "{{ WORDPRESS_DB_NAME | default('wordpress') }}"
-  wordpress_db_user: "{{ WORDPRESS_DB_USER | default('wordpress') }}"
-  wordpress_db_password: "{{ WORDPRESS_DB_PASSWORD | default('password') }}"
-  wordpress_db_charset: "{{ WORDPRESS_DB_CHARSET | default('utf8mb4') }}"
+wp_db_host: "{{ WORDPRESS_DB_HOST | default('localhost') }}"
+wp_db_name: "{{ WORDPRESS_DB_NAME | default('wordpress') }}"
+wp_db_user: "{{ WORDPRESS_DB_USER | default('wordpress') }}"
+wp_db_password: "{{ WORDPRESS_DB_PASSWORD | default('password') }}"
+      wp_db_charset: "{{ WORDPRESS_DB_CHARSET | default('utf8mb4') }}"
   
   # Apache設定
   wordpress_document_root: "{{ WORDPRESS_DOCUMENT_ROOT | default('/var/www/html') }}"

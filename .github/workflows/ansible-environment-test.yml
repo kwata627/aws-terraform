@@ -201,9 +201,9 @@ jobs:
         run: |
           echo "Testing database connection..."
           ansible wordpress -i inventory/hosts.yml -m mysql_query -a "
-              login_host={{ wordpress_db_host }}
-              login_user={{ wordpress_db_user }}
-              login_password={{ wordpress_db_password }}
+              login_host={{ rds_host }}
+              login_user={{ wp_db_user }}
+              login_password={{ wp_db_password }}
               query='SELECT 1'
           " --extra-vars "@group_vars/wordpress.yml"
           echo "✓ Database connection test completed"

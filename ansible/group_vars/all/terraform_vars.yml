@@ -1,10 +1,11 @@
 domain_name: shamolife.com
 wordpress_domain: shamolife.com
 rds_endpoint: wp-shamo-rds.cjg0emy2snss.ap-northeast-1.rds.amazonaws.com:3306
+rds_host: wp-shamo-rds.cjg0emy2snss.ap-northeast-1.rds.amazonaws.com
+rds_port: '3306'
 s3_bucket_name: wp-shamo-s3
 project_name: wp-shamo
 wordpress_url: https://shamolife.com
-ssh_key_name: wp-shamo-ssh-key
 wp_db_password: breadhouse
 wp_db_user: admin
 wp_db_name: wordpress

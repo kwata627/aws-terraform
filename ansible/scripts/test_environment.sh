@@ -36,7 +36,7 @@ ansible wordpress -m wait_for -a "port=22 timeout=5"
 # 7. WordPressアクセステスト
 echo "7. WordPressアクセスをテスト中..."
 WORDPRESS_IP=$(terraform output -raw wordpress_public_ip)
-if curl -f -s "http://$WORDPRESS_IP" > /dev/null; then
+if curl -f -s "https://$WORDPRESS_IP" > /dev/null; then
     echo "✅ WordPressサイトにアクセス可能"
 else
     echo "❌ WordPressサイトにアクセス不可"
@@ -44,12 +44,7 @@ fi
 
 # 8. データベース接続テスト
 echo "8. データベース接続をテスト中..."
-ansible wordpress -m mysql_query -a "
-    login_host={{ wordpress_db_host }}
-    login_user={{ wordpress_db_user }}
-    login_password={{ wordpress_db_password }}
-    query='SELECT 1'
-" --extra-vars "@group_vars/wordpress.yml"
+ansible wordpress -m mysql_query -a "login_host={{ rds_host }} login_port={{ rds_port }} login_user={{ wp_db_user }} login_password={{ wp_db_password }} login_db={{ wp_db_name }} query='SELECT 1'" --extra-vars "@group_vars/all/terraform_vars.yml"
 
 echo ""
 echo "=== テスト完了 ===" 

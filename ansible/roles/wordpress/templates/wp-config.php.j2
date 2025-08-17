@@ -96,12 +96,18 @@ define('AUTOMATIC_UPDATER_DISABLED', true);
 define('DISALLOW_FILE_EDIT', true);
 define('DISALLOW_FILE_MODS', false);
 
-// メモリ制限
-define('WP_MEMORY_LIMIT', '512M');
-define('WP_MAX_MEMORY_LIMIT', '1024M');
+// メモリ制限（アップロード用に増加）
+define('WP_MEMORY_LIMIT', '{{ wp_memory_limit | default("1024M") }}');
+define('WP_MAX_MEMORY_LIMIT', '{{ wp_max_memory_limit | default("2048M") }}');
+
+// ファイルアップロード関連設定
+define('WP_ALLOW_REPAIR', {{ wp_allow_repair | default(true) | lower }});
+define('WP_POST_REVISIONS', {{ wp_post_revisions | default(5) }});
+
+// タイムアウト設定
+define('WP_CRON_LOCK_TIMEOUT', {{ wp_cron_lock_timeout | default(300) }});
 
 // リビジョン・自動保存・ゴミ箱
-define('WP_POST_REVISIONS', 5);
 define('AUTOSAVE_INTERVAL', 300);
 define('EMPTY_TRASH_DAYS', 30);
 

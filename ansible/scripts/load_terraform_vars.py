@@ -30,8 +30,11 @@ DEFAULT_LOG_LEVEL = "INFO"
 
 def setup_logging(log_level: str = DEFAULT_LOG_LEVEL) -> logging.Logger:
     """ログ設定の初期化"""
+    # 環境変数からログレベルを取得
+    env_log_level = os.getenv('LOG_LEVEL', log_level)
+    
     logging.basicConfig(
-        level=getattr(logging, log_level.upper()),
+        level=getattr(logging, env_log_level.upper()),
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
             logging.StreamHandler(),
@@ -212,7 +215,12 @@ def merge_configurations(
     # 2. deployment_config.jsonで上書き
     if deployment_config:
         if 'production' in deployment_config:
-            merged_config.update(deployment_config['production'])
+            # productionセクションの値を統合
+            production_config = deployment_config['production']
+            for key, value in production_config.items():
+                if value and value != 'null':  # 空でない値のみ上書き
+                    merged_config[key] = value
+                    logger.debug(f"deployment_config.jsonから設定: {key} = {value}")
         if 'validation' in deployment_config:
             merged_config['validation'] = deployment_config['validation']
         logger.info("deployment_config.jsonの設定値を統合")
@@ -235,6 +243,12 @@ def merge_configurations(
             elif isinstance(nat_output, str):
                 merged_config['nat_instance_public_ip'] = nat_output
         
+        # deployment_config.jsonのIPアドレスも統合
+        if 'ec2_public_ip' in merged_config:
+            merged_config['wordpress_public_ip'] = merged_config['ec2_public_ip']
+        if 'nat_instance_ip' in merged_config:
+            merged_config['nat_instance_public_ip'] = merged_config['nat_instance_ip']
+        
         # RDS Endpoint
         if 'rds_endpoint' in terraform_output:
             rds_output = terraform_output['rds_endpoint']
@@ -242,14 +256,6 @@ def merge_configurations(
                 merged_config['rds_endpoint'] = rds_output['value']
             elif isinstance(rds_output, str):
                 merged_config['rds_endpoint'] = rds_output
-        
-        # RDS Username
-        if 'db_username' in terraform_output:
-            db_username_output = terraform_output['db_username']
-            if isinstance(db_username_output, dict) and 'value' in db_username_output:
-                merged_config['wp_db_user'] = db_username_output['value']
-            elif isinstance(db_username_output, str):
-                merged_config['wp_db_user'] = db_username_output
         
         # SSH Key Name
         if 'ssh_key_name' in terraform_output:
@@ -261,7 +267,7 @@ def merge_configurations(
         
         logger.info("Terraform出力の動的値を統合")
     
-    # 4. 環境変数で上書き（最高優先度）
+    # 4. 環境変数で上書き（terraform.tfvarsの値を最優先）
     env_vars = {
         'WORDPRESS_DB_PASSWORD': 'db_password',
         'WORDPRESS_DB_USER': 'db_user',
@@ -272,13 +278,21 @@ def merge_configurations(
     
     for env_var, config_key in env_vars.items():
         env_value = os.getenv(env_var)
-        if env_value:
+        # terraform.tfvarsの値が既に設定されている場合は、環境変数を無視
+        if config_key in merged_config:
+            logger.debug(f"terraform.tfvarsの値が既に設定されているため、環境変数を無視: {config_key}")
+            continue
+        
+        if env_value and env_value not in ['your_secure_password', 'your-db-password', 'your-db-user', 'your-db-name', 'example.com']:
+            # デフォルト値でない場合のみ環境変数を使用
             merged_config[config_key] = env_value
             # パスワードはログに出力しない
             if 'password' in config_key.lower():
                 logger.debug(f"環境変数から設定: {config_key} = ***")
             else:
                 logger.debug(f"環境変数から設定: {config_key} = {env_value}")
+        else:
+            logger.debug(f"環境変数はデフォルト値または未設定のため、スキップ: {env_var}")
     
     logger.info(f"設定値の統合が完了しました: {len(merged_config)}個の設定値")
     return merged_config
@@ -292,6 +306,14 @@ def convert_terraform_to_ansible_vars(config: Dict[str, Any]) -> Dict[str, Any]:
     logger = logging.getLogger(__name__)
     
     logger.info("統合設定をAnsible変数に変換中...")
+    
+    # デバッグ用：統合された設定の内容を表示
+    logger.debug("統合された設定の内容:")
+    for key, value in config.items():
+        if 'password' in key.lower():
+            logger.debug(f"  {key}: ***")
+        else:
+            logger.debug(f"  {key}: {value}")
     
     ansible_vars = {}
     
@@ -309,6 +331,16 @@ def convert_terraform_to_ansible_vars(config: Dict[str, Any]) -> Dict[str, Any]:
         if rds_endpoint:
             ansible_vars['rds_endpoint'] = rds_endpoint
             logger.info(f"RDSエンドポイントを設定: {rds_endpoint}")
+    
+    # RDSホストとポートの分離
+    if 'rds_endpoint' in ansible_vars:
+        rds_endpoint = ansible_vars['rds_endpoint']
+        if ':' in rds_endpoint:
+            rds_host, rds_port = rds_endpoint.split(':', 1)
+            ansible_vars['rds_host'] = rds_host
+            ansible_vars['rds_port'] = rds_port
+            logger.info(f"RDSホストを設定: {rds_host}")
+            logger.info(f"RDSポートを設定: {rds_port}")
     
     # S3バケット名
     if 's3_bucket_name' in config:
@@ -349,7 +381,7 @@ def convert_terraform_to_ansible_vars(config: Dict[str, Any]) -> Dict[str, Any]:
         ansible_vars['wp_db_password'] = config['db_password']
         logger.info("データベースパスワードを設定")
     
-    # データベースユーザー名（TerraformのRDSモジュールのデフォルト値を使用）
+    # データベースユーザー名（RDSモジュールのデフォルト値を使用）
     if 'wp_db_user' in config:
         ansible_vars['wp_db_user'] = config['wp_db_user']
         logger.info(f"データベースユーザーを設定: {config['wp_db_user']}")
@@ -360,7 +392,8 @@ def convert_terraform_to_ansible_vars(config: Dict[str, Any]) -> Dict[str, Any]:
         ansible_vars['wp_db_user'] = config['db_user']
         logger.info(f"データベースユーザーを設定: {config['db_user']}")
     else:
-        ansible_vars['wp_db_user'] = 'admin'  # RDSモジュールのデフォルト値
+        # RDSモジュールのデフォルト値（admin）を使用
+        ansible_vars['wp_db_user'] = 'admin'
         logger.info("データベースユーザーをデフォルト値に設定: admin")
     
     if 'db_name' in config:
@@ -383,7 +416,7 @@ def convert_terraform_to_ansible_vars(config: Dict[str, Any]) -> Dict[str, Any]:
         ansible_vars['lets_encrypt_email'] = config['lets_encrypt_email']
         logger.info(f"Let's Encryptメールアドレスを設定: {config['lets_encrypt_email']}")
     
-    # 環境変数から追加の変数を取得
+    # 環境変数から追加の変数を取得（terraform.tfvarsの値を最優先）
     env_vars = {
         'WORDPRESS_DB_PASSWORD': 'wp_db_password',
         'WORDPRESS_DB_USER': 'wp_db_user',
@@ -394,9 +427,17 @@ def convert_terraform_to_ansible_vars(config: Dict[str, Any]) -> Dict[str, Any]:
     
     for env_var, ansible_var in env_vars.items():
         env_value = os.getenv(env_var)
-        if env_value:
+        # terraform.tfvarsの値が既に設定されている場合は、環境変数を無視
+        if ansible_var in ansible_vars:
+            logger.debug(f"terraform.tfvarsの値が既に設定されているため、環境変数を無視: {ansible_var}")
+            continue
+        
+        if env_value and env_value not in ['your_secure_password', 'your-db-password', 'your-db-user', 'your-db-name', 'example.com']:
+            # デフォルト値でない場合のみ環境変数を使用
             ansible_vars[ansible_var] = env_value
             logger.info(f"環境変数から設定: {ansible_var} = {env_value}")
+        else:
+            logger.debug(f"環境変数はデフォルト値または未設定のため、スキップ: {env_var}")
     
     logger.info("Ansible変数への変換が完了しました")
     return ansible_vars

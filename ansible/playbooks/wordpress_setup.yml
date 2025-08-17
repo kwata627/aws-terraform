@@ -37,9 +37,11 @@
     - ../group_vars/all/terraform_vars.yml
   vars:
     # データベース設定
-    wp_db_name: wordpress
-    wp_db_user: admin
-    wp_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password') }}"
+    wp_db_name: "{{ wp_db_name | default('wordpress') }}"
+    wp_db_user: "{{ wp_db_user | default('admin') }}"
+    wp_db_password: "{{ wp_db_password | default(lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password')) }}"
+    wp_db_host: "{{ rds_host | default('localhost') }}"
+    wp_db_port: "{{ rds_port | default('3306') }}"
     
     # WordPress設定（domain_nameとwordpress_domainを統一）
     wordpress_domain: "{{ domain_name | default('example.com') }}"

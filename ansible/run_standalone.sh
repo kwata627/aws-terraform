@@ -97,11 +97,8 @@ validate_config_files() {
     
     # deployment_config.jsonの確認
     if [ -f "$deployment_config" ]; then
-        if validate_config_file "$deployment_config" "json"; then
-            log_info "deployment_config.jsonファイルを確認しました: $deployment_config"
-        else
-            log_warn "deployment_config.jsonの形式が無効です"
-        fi
+        validate_config_file "$deployment_config" "json"
+        log_info "deployment_config.jsonファイルを確認しました: $deployment_config"
     else
         log_warn "deployment_config.jsonファイルが見つかりません: $deployment_config"
         log_info "terraform.tfvarsのみを使用して実行します"

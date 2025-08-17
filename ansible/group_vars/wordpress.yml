@@ -5,11 +5,11 @@ wordpress_locale: ja
 wordpress_language: ja
 
 # データベース設定
-wordpress_db_host: "{{ rds_endpoint | default(lookup('env', 'WORDPRESS_DB_HOST') | default('localhost')) }}"
-wordpress_db_name: "{{ lookup('env', 'WORDPRESS_DB_NAME') | default('wordpress') }}"
-wordpress_db_user: "{{ lookup('env', 'WORDPRESS_DB_USER') | default('wordpress', true) }}"
-wordpress_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password', true) }}"
-wordpress_db_charset: "{{ lookup('env', 'WORDPRESS_DB_CHARSET') | default('utf8mb4') }}"
+wp_db_host: "{{ rds_endpoint | default(lookup('env', 'WORDPRESS_DB_HOST') | default('localhost')) }}"
+wp_db_name: "{{ lookup('env', 'WORDPRESS_DB_NAME') | default('wordpress') }}"
+wp_db_user: "{{ lookup('env', 'WORDPRESS_DB_USER') | default('wordpress', true) }}"
+wp_db_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password', true) }}"
+wp_db_charset: "{{ lookup('env', 'WORDPRESS_DB_CHARSET') | default('utf8mb4') }}"
 
 # Apache設定
 wordpress_document_root: /var/www/html

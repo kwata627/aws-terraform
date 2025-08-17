@@ -34,6 +34,16 @@
   notify: restart php-fpm
   tags: php,config,php-fpm
 
+- name: Configure PHP-FPM upload limits
+  template:
+    src: upload-limits.conf.j2
+    dest: /etc/php-fpm.d/upload-limits.conf
+    mode: '0644'
+  become: yes
+  when: php_fpm_enabled | default(false)
+  notify: restart php-fpm
+  tags: php,config,php-fpm
+
 - name: Enable and start PHP-FPM
   service:
     name: php-fpm

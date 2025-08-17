@@ -26,14 +26,18 @@ wp_automatic_updater_disabled: true
 wp_disallow_file_edit: true
 wp_disallow_file_mods: false
 
-# メモリ設定
-wp_memory_limit: "256M"
-wp_max_memory_limit: "512M"
+# メモリ設定（アップロード用に増加）
+wp_memory_limit: "1024M"
+wp_max_memory_limit: "2048M"
 
 # パフォーマンス設定
 wp_post_revisions: 5
 wp_autosave_interval: 300
 wp_empty_trash_days: 30
+
+# ファイルアップロード関連設定
+wp_allow_repair: true
+wp_cron_lock_timeout: 300
 
 # ファイル権限設定
 wp_htaccess_mode: "0664"

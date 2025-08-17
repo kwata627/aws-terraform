@@ -4,10 +4,10 @@ environment: development
 debug_mode: true
 
 # データベース設定
-wordpress_db_host: localhost
-wordpress_db_name: wordpress_dev
-wordpress_db_user: wordpress_dev
-wordpress_db_password: dev_password
+wp_db_host: localhost
+wp_db_name: wordpress_dev
+wp_db_user: wordpress_dev
+wp_db_password: dev_password
 
 # セキュリティ設定
 wordpress_debug: true

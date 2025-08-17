@@ -1,0 +1,60 @@
+---
+# アップロード制限確認プレイブック
+- name: Check Upload Limits
+  hosts: wordpress
+  become: yes
+  
+  tasks:
+    - name: Check PHP configuration
+      command: php -i | grep -E "(upload_max_filesize|post_max_size|memory_limit|max_execution_time)"
+      register: php_config
+      changed_when: false
+    
+    - name: Display PHP configuration
+      debug:
+        var: php_config.stdout_lines
+    
+    - name: Check PHP-FPM configuration
+      command: php-fpm -t
+      register: php_fpm_test
+      changed_when: false
+    
+    - name: Display PHP-FPM test result
+      debug:
+        var: php_fpm_test.stdout_lines
+    
+    - name: Check Apache configuration
+      command: apachectl configtest
+      register: apache_test
+      changed_when: false
+    
+    - name: Display Apache test result
+      debug:
+        var: apache_test.stdout_lines
+    
+    - name: Check PHP-FPM process
+      shell: ps aux | grep php-fpm
+      register: php_fpm_process
+      changed_when: false
+    
+    - name: Display PHP-FPM process
+      debug:
+        var: php_fpm_process.stdout_lines
+    
+    - name: Check Apache process
+      shell: ps aux | grep httpd
+      register: apache_process
+      changed_when: false
+    
+    - name: Display Apache process
+      debug:
+        var: apache_process.stdout_lines
+    
+    - name: Check PHP-FPM socket
+      stat:
+        path: /run/php-fpm/www.sock
+      register: php_fpm_socket
+    
+    - name: Display PHP-FPM socket status
+      debug:
+        var: php_fpm_socket.stat.exists

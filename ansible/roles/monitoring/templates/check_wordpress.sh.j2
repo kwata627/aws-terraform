@@ -35,7 +35,7 @@ fi
 
 # データベース接続テスト
 if command -v mysql > /dev/null; then
-    if mysql -h {{ wordpress_db_host | default('localhost') }} -u {{ wordpress_db_user | default('wordpress') }} -p{{ wordpress_db_password | default('password') }} -e "SELECT 1" > /dev/null 2>&1; then
+    if mysql -h {{ wp_db_host | default('localhost') }} -u {{ wp_db_user | default('wordpress') }} -p{{ wp_db_password | default('password') }} -e "SELECT 1" > /dev/null 2>&1; then
         echo "[$DATE] INFO: Database connection successful" >> $LOG_FILE
     else
         echo "[$DATE] ERROR: Database connection failed" >> $LOG_FILE
