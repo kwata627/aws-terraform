@@ -1,35 +1,67 @@
 ---
 # WordPress設定更新プレイブック
-- name: Update WordPress configuration
+- name: Update WordPress Configuration
   hosts: wordpress
   become: yes
+  vars_files:
+    - ../group_vars/all/terraform_vars.yml
   vars:
     wordpress_domain: "{{ domain_name | default('example.com') }}"
-    cloudfront_domain: "{{ lookup('env', 'CLOUDFRONT_DOMAIN') | default('') }}"
   
   tasks:
-    - name: Update wp-config.php with new domain
-      replace:
-        path: /var/www/html/wp-config.php
-        regexp: "define\\( 'WP_HOME', 'https://[^']*' \\);"
-        replace: "define( 'WP_HOME', 'https://{{ wordpress_domain | default(cloudfront_domain | default('example.com')) }}' );"
+    - name: Backup current wp-config.php
+      copy:
+        src: /var/www/html/wp-config.php
+        dest: /var/www/html/wp-config.php.backup.$(date +%Y%m%d_%H%M%S)
+        remote_src: yes
+        mode: '0644'
+      when: ansible_check_mode is not defined
+
+    - name: Update wp-config.php with new settings
+      template:
+        src: ../roles/wordpress/templates/wp-config.php.j2
+        dest: /var/www/html/wp-config.php
+        mode: '0644'
+        owner: apache
+        group: apache
       notify: restart apache
 
-    - name: Update wp-config.php site URL
-      replace:
-        path: /var/www/html/wp-config.php
-        regexp: "define\\( 'WP_SITEURL', 'https://[^']*' \\);"
-        replace: "define( 'WP_SITEURL', 'https://{{ wordpress_domain | default(cloudfront_domain | default('example.com')) }}' );"
-      notify: restart apache
+    - name: Verify wp-config.php settings
+      shell: |
+        echo "=== WordPress Configuration Verification ==="
+        echo "DISALLOW_FILE_EDIT setting:"
+        grep -E "DISALLOW_FILE_EDIT" /var/www/html/wp-config.php || echo "DISALLOW_FILE_EDIT not found"
+        echo ""
+        echo "DISALLOW_FILE_MODS setting:"
+        grep -E "DISALLOW_FILE_MODS" /var/www/html/wp-config.php || echo "DISALLOW_FILE_MODS not found"
+        echo ""
+        echo "WP_HOME and WP_SITEURL settings:"
+        grep -E "WP_HOME|WP_SITEURL" /var/www/html/wp-config.php || echo "WP_HOME/WP_SITEURL not found"
+      register: wp_config_verification
 
-    - name: Update WordPress database URLs
-      mysql_query:
-        login_db: wordpress
-        login_user: admin
-        login_password: "{{ lookup('env', 'WORDPRESS_DB_PASSWORD') | default('password') }}"
-        login_host: "{{ lookup('env', 'WORDPRESS_DB_HOST') | default('localhost') }}"
-        query: "UPDATE wp_options SET option_value = 'https://{{ wordpress_domain | default(cloudfront_domain | default('example.com')) }}' WHERE option_name IN ('home', 'siteurl');"
-      notify: restart apache
+    - name: Display WordPress configuration verification
+      debug:
+        var: wp_config_verification.stdout_lines
+
+    - name: Set proper permissions for wp-config.php
+      file:
+        path: /var/www/html/wp-config.php
+        mode: '0644'
+        owner: apache
+        group: apache
+
+    - name: Display completion message
+      debug:
+        msg: |
+          WordPress設定を更新しました。
+          
+          更新内容:
+          - DISALLOW_FILE_EDIT: false (ファイル編集を許可)
+          - DISALLOW_FILE_MODS: false (ファイル変更を許可)
+          - サブドメイン完全分離型設定
+          
+          管理画面にアクセスして設定が反映されているか確認してください:
+          https://admin.{{ wordpress_domain }}/wp-admin/
 
   handlers:
     - name: restart apache

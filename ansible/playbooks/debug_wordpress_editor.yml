@@ -1,0 +1,116 @@
+---
+# WordPressエディタデバッグプレイブック
+- name: Debug WordPress Editor Issues
+  hosts: wordpress
+  become: yes
+  vars_files:
+    - ../group_vars/all/terraform_vars.yml
+  vars:
+    wordpress_domain: "{{ domain_name | default('example.com') }}"
+  
+  tasks:
+    - name: Check current Apache configuration
+      shell: httpd -t
+      register: apache_status
+      changed_when: false
+
+    - name: Display Apache virtual hosts
+      debug:
+        var: apache_status.stdout_lines
+
+    - name: Check WordPress admin page headers
+      uri:
+        url: "https://admin.{{ wordpress_domain }}/wp-admin/"
+        method: GET
+        return_content: no
+        status_code: [200, 302]
+      register: wp_admin_response
+
+    - name: Display WordPress admin headers
+      debug:
+        var: wp_admin_response.headers
+
+    - name: Check WordPress editor page headers
+      uri:
+        url: "https://admin.{{ wordpress_domain }}/wp-admin/post-new.php"
+        method: GET
+        return_content: no
+        status_code: [200, 302]
+      register: wp_editor_response
+
+    - name: Display WordPress editor headers
+      debug:
+        var: wp_editor_response.headers
+
+    - name: Check browser console for CSP violations
+      shell: |
+        echo "=== CSP Debug Information ==="
+        echo "Testing WordPress.org connectivity..."
+        curl -I https://wordpress.org 2>/dev/null | head -5
+        echo ""
+        echo "Testing api.wordpress.org connectivity..."
+        curl -I https://api.wordpress.org 2>/dev/null | head -5
+        echo ""
+        echo "Testing wp-includes scripts..."
+        curl -I https://admin.{{ wordpress_domain }}/wp-includes/js/ 2>/dev/null | head -5
+      register: csp_debug
+
+    - name: Display CSP debug information
+      debug:
+        var: csp_debug.stdout_lines
+
+    - name: Check WordPress configuration
+      shell: |
+        echo "=== WordPress Configuration ==="
+        if [ -f /var/www/html/wp-config.php ]; then
+          echo "wp-config.php exists"
+          grep -E "(WP_HOME|WP_SITEURL)" /var/www/html/wp-config.php || echo "WP_HOME/WP_SITEURL not found"
+        else
+          echo "wp-config.php not found"
+        fi
+      register: wp_config_check
+
+    - name: Display WordPress configuration
+      debug:
+        var: wp_config_check.stdout_lines
+
+    - name: Check Apache error logs for CSP violations
+      shell: |
+        echo "=== Recent Apache Error Logs ==="
+        tail -20 /var/log/httpd/wordpress_admin_error.log 2>/dev/null || echo "No admin error log found"
+        echo ""
+        echo "=== Recent Apache Access Logs ==="
+        tail -10 /var/log/httpd/wordpress_admin_access.log 2>/dev/null || echo "No admin access log found"
+      register: apache_logs
+
+    - name: Display Apache logs
+      debug:
+        var: apache_logs.stdout_lines
+
+    - name: Create temporary CSP debug configuration
+      template:
+        src: ../roles/apache/templates/csp-debug.conf.j2
+        dest: /etc/httpd/conf.d/csp-debug.conf
+        mode: '0644'
+        owner: root
+        group: root
+      notify: restart apache
+
+    - name: Display completion message
+      debug:
+        msg: |
+          WordPressエディタのデバッグ情報を収集しました。
+          
+          次のステップ:
+          1. ブラウザで https://admin.{{ wordpress_domain }}/wp-admin/post-new.php にアクセス
+          2. 開発者ツール（F12）を開く
+          3. ConsoleタブでCSPエラーを確認
+          4. Networkタブでブロックされたリソースを確認
+          
+          デバッグ用のCSP設定を一時的に追加しました。
+
+  handlers:
+    - name: restart apache
+      service:
+        name: httpd
+        state: restarted

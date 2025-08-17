@@ -12,11 +12,6 @@ SSLHonorCipherOrder On
 SSLCompression off
 SSLSessionTickets Off
 
-# HSTS設定
-Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-Header always set X-Frame-Options DENY
-Header always set X-Content-Type-Options nosniff
-
 # HTTPS VirtualHost
 <VirtualHost *:443>
     ServerName {{ domain_name }}
@@ -25,15 +20,16 @@ Header always set X-Content-Type-Options nosniff
     
     # SSL証明書設定
     SSLEngine on
-    SSLCertificateFile /etc/httpd/ssl/fullchain.pem
-    SSLCertificateKeyFile /etc/httpd/ssl/privkey.pem
+    SSLCertificateFile /etc/letsencrypt/live/{{ domain_name }}/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/{{ domain_name }}/privkey.pem
     
     # セキュリティヘッダー
     Header always set X-Frame-Options SAMEORIGIN
     Header always set X-XSS-Protection "1; mode=block"
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https:; frame-src 'self'; object-src 'none';"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.wordpress.org https://api.wordpress.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.wordpress.org; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.wordpress.org; img-src 'self' data: https: https://*.wordpress.org; connect-src 'self' https://*.wordpress.org https://api.wordpress.org; frame-src 'self'; object-src 'none';"
     Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
     
     # ディレクトリ設定
     <Directory /var/www/html>

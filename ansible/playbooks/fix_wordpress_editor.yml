@@ -1,0 +1,79 @@
+---
+# WordPressエディタ修正プレイブック
+- name: Fix WordPress Editor CSP Issues
+  hosts: wordpress
+  become: yes
+  vars_files:
+    - ../group_vars/all/terraform_vars.yml
+  vars:
+    wordpress_domain: "{{ domain_name | default('example.com') }}"
+  
+  tasks:
+    - name: Backup current Apache configuration
+      copy:
+        src: /etc/httpd/conf.d/wordpress.conf
+        dest: /etc/httpd/conf.d/wordpress.conf.backup.$(date +%Y%m%d_%H%M%S)
+        remote_src: yes
+        mode: '0644'
+      when: ansible_check_mode is not defined
+
+    - name: Update Apache configuration for WordPress editor
+      template:
+        src: ../roles/apache/templates/wordpress.conf.j2
+        dest: /etc/httpd/conf.d/wordpress.conf
+        mode: '0644'
+        owner: root
+        group: root
+      notify: restart apache
+
+    - name: Update SSL configuration
+      template:
+        src: ../roles/apache/templates/ssl.conf.j2
+        dest: /etc/httpd/conf.d/ssl.conf
+        mode: '0644'
+        owner: root
+        group: root
+      notify: restart apache
+
+    - name: Update security configuration
+      template:
+        src: ../roles/security/templates/ssl-security.conf.j2
+        dest: /etc/httpd/conf.d/ssl-security.conf
+        mode: '0644'
+        owner: root
+        group: root
+      notify: restart apache
+
+    - name: Test Apache configuration
+      command: apachectl configtest
+      register: apache_config_test
+      changed_when: false
+
+    - name: Display Apache configuration test result
+      debug:
+        var: apache_config_test.stdout_lines
+
+    - name: Restart Apache to apply changes
+      service:
+        name: httpd
+        state: restarted
+      when: apache_config_test.rc == 0
+
+    - name: Display completion message
+      debug:
+        msg: |
+          WordPressエディタのCSP設定を修正しました。
+          
+          修正内容:
+          - WordPress.orgドメインの許可
+          - API接続の許可
+          - エディタ用アセットの許可
+          
+          管理画面にアクセスしてエディタが正常に動作するか確認してください:
+          https://admin.{{ wordpress_domain }}
+
+  handlers:
+    - name: restart apache
+      service:
+        name: httpd
+        state: restarted

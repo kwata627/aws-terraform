@@ -1,0 +1,16 @@
+# CSP Debug Configuration
+# 一時的なデバッグ用設定 - 問題解決後は削除してください
+
+# WordPressエディタ用の詳細なCSP設定
+<LocationMatch "^/wp-admin/.*">
+    <IfModule mod_headers.c>
+        # デバッグ用のCSP設定（より緩い設定）
+        Header always set Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http: data: blob:; style-src 'self' 'unsafe-inline' https: http: data: blob:; font-src 'self' https: http: data: blob:; img-src 'self' data: blob: https: http:; connect-src 'self' https: http: ws: wss:; frame-src 'self' https: http:; object-src 'none'; media-src 'self' https: http:; worker-src 'self' blob:;"
+        
+        # CSPレポート用（オプション）
+        Header always set Content-Security-Policy-Report-Only "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http: data: blob:; style-src 'self' 'unsafe-inline' https: http: data: blob:; font-src 'self' https: http: data: blob:; img-src 'self' data: blob: https: http:; connect-src 'self' https: http: ws: wss:; frame-src 'self' https: http:; object-src 'none'; media-src 'self' https: http:; worker-src 'self' blob:;"
+    </IfModule>
+</LocationMatch>
+
+# デバッグ用のログ設定
+LogLevel debug

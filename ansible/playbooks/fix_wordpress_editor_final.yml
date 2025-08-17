@@ -1,0 +1,79 @@
+---
+# WordPressエディタ最終修正プレイブック
+- name: Final Fix for WordPress Editor CSP Issues
+  hosts: wordpress
+  become: yes
+  vars_files:
+    - ../group_vars/all/terraform_vars.yml
+  vars:
+    wordpress_domain: "{{ domain_name | default('example.com') }}"
+  
+  tasks:
+    - name: Backup current WordPress configuration
+      copy:
+        src: /etc/httpd/conf.d/wordpress.conf
+        dest: /etc/httpd/conf.d/wordpress.conf.backup.$(date +%Y%m%d_%H%M%S)
+        remote_src: yes
+        mode: '0644'
+      when: ansible_check_mode is not defined
+
+    - name: Create WordPress configuration with relaxed CSP for editor
+      template:
+        src: ../roles/apache/templates/wordpress-editor-fix.conf.j2
+        dest: /etc/httpd/conf.d/wordpress.conf
+        mode: '0644'
+        owner: root
+        group: root
+      notify: restart apache
+
+    - name: Remove debug CSP configuration
+      file:
+        path: /etc/httpd/conf.d/csp-debug.conf
+        state: absent
+      notify: restart apache
+
+    - name: Test Apache configuration
+      command: apachectl configtest
+      register: apache_config_test
+      changed_when: false
+
+    - name: Display Apache configuration test result
+      debug:
+        var: apache_config_test.stdout_lines
+
+    - name: Restart Apache to apply changes
+      service:
+        name: httpd
+        state: restarted
+      when: apache_config_test.rc == 0
+
+    - name: Verify CSP headers
+      shell: |
+        echo "=== Testing CSP Headers ==="
+        curl -I https://admin.{{ wordpress_domain }}/wp-admin/post-new.php 2>/dev/null | grep -i 'content-security-policy' || echo "No CSP headers found"
+      register: csp_verification
+
+    - name: Display CSP verification
+      debug:
+        var: csp_verification.stdout_lines
+
+    - name: Display completion message
+      debug:
+        msg: |
+          WordPressエディタのCSP問題を修正しました。
+          
+          修正内容:
+          - エディタ用の緩いCSP設定を適用
+          - デバッグ設定を削除
+          - 競合するCSPヘッダーを解消
+          
+          管理画面にアクセスしてエディタが正常に動作するか確認してください:
+          https://admin.{{ wordpress_domain }}/wp-admin/post-new.php
+          
+          問題が解決したら、セキュリティを強化するためにCSP設定を調整できます。
+
+  handlers:
+    - name: restart apache
+      service:
+        name: httpd
+        state: restarted

@@ -23,7 +23,7 @@ wp_cache_enabled: false
 
 # セキュリティ設定
 wp_automatic_updater_disabled: true
-wp_disallow_file_edit: true
+wp_disallow_file_edit: false
 wp_disallow_file_mods: false
 
 # メモリ設定（アップロード用に増加）

@@ -92,9 +92,9 @@ if ($host === 'admin.{{ wordpress_domain | default('example.com') }}') {
 define('FORCE_SSL_ADMIN', true);
 
 // 標準の自動更新・編集無効化
-define('AUTOMATIC_UPDATER_DISABLED', true);
-define('DISALLOW_FILE_EDIT', true);
-define('DISALLOW_FILE_MODS', false);
+define('AUTOMATIC_UPDATER_DISABLED', {{ wp_automatic_updater_disabled | default(true) | lower }});
+define('DISALLOW_FILE_EDIT', {{ wp_disallow_file_edit | default(false) | lower }});
+define('DISALLOW_FILE_MODS', {{ wp_disallow_file_mods | default(false) | lower }});
 
 // メモリ制限（アップロード用に増加）
 define('WP_MEMORY_LIMIT', '{{ wp_memory_limit | default("1024M") }}');
