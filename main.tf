@@ -10,25 +10,23 @@
 # Domain Analysis
 # -----------------------------------------------------------------------------
 
-# ドメインの新規/既存を判別するためのデータソース
-data "external" "domain_analysis" {
-  program = ["bash", "${path.module}/scripts/check_nameservers.sh", "-d", local.domain_config.domain_name, "-t"]
-  
-  # 環境変数を設定してTerraformモードを有効化
-  query = {
-    TERRAFORM_MODE = "true"
-    DOMAIN_NAME = local.domain_config.domain_name
-  }
-}
-
-# ローカル変数でドメイン分析結果を解析
+# ドメイン分析
 locals {
-  domain_analysis = data.external.domain_analysis.result
+  # ドメイン分析結果
+  domain_analysis = {
+    domain_name = local.domain_config.domain_name
+    domain_exists_in_route53 = false  # デフォルト値
+    domain_exists_in_dns = false      # デフォルト値
+    domain_registered = false         # デフォルト値
+    should_register_domain = var.register_domain
+  }
+  
+  # ドメイン設定
   should_use_existing_zone = false  # 強制再作成のため、既存ホストゾーンを使用しない
-  should_register_domain = try(local.domain_analysis.should_register_domain, "false") == "true"
-  domain_exists_in_route53 = try(local.domain_analysis.domain_exists_in_route53, "false") == "true"
-  domain_exists_in_dns = try(local.domain_analysis.domain_exists_in_dns, "false") == "true"
-  domain_registered = try(local.domain_analysis.domain_registered, "false") == "true"
+  should_register_domain = var.register_domain
+  domain_exists_in_route53 = false
+  domain_exists_in_dns = false
+  domain_registered = false
 }
 
 # -----------------------------------------------------------------------------
@@ -316,8 +314,6 @@ module "route53" {
   providers = {
     aws.us_east_1 = aws.us_east_1
   }
-  
-  depends_on = [data.external.domain_analysis]
 }
 
 # -----------------------------------------------------------------------------

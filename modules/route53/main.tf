@@ -38,33 +38,46 @@ data "aws_caller_identity" "current" {}
 
 data "aws_region" "current" {}
 
-# ホストゾーン選択スクリプトの実行
-data "external" "hosted_zone_selection" {
-  count = var.should_use_existing_zone && var.domain_exists_in_route53 ? 1 : 0
+# -----------------------------------------------------------------------------
+# Domain Analysis (Terraform Native)
+# -----------------------------------------------------------------------------
+
+# ドメイン分析をTerraformネイティブで実行
+locals {
+  # ドメイン分析結果（Terraformネイティブ処理）
+  domain_analysis_result = {
+    domain_name = var.domain_name
+    domain_exists_in_route53 = var.domain_exists_in_route53
+    domain_exists_in_dns = var.domain_exists_in_dns
+    domain_registered = var.domain_registered
+    should_register_domain = var.register_domain
+  }
   
-  program = ["bash", "${path.module}/scripts/select_hosted_zone.sh", "-d", var.domain_name, "-t"]
+  # ホストゾーン選択結果（簡素化）
+  hosted_zone_selection_result = {
+    selected_zone_id = null
+    zone_count = 0
+    error = ""
+  }
   
-  query = {
-    DOMAIN_NAME = var.domain_name
+  # ネームサーバー情報（簡素化）
+  domain_nameservers_result = {
+    nameservers = "[]"
+    error = ""
+  }
+  
+  # ドメイン登録確認結果（簡素化）
+  domain_check_result = {
+    register_domain = var.register_domain
+    domain_unavailable = false
+    error = ""
   }
 }
 
-# 既存のRoute53ホストゾーンを検索（選択されたホストゾーンIDを使用）
+# 既存のRoute53ホストゾーンを検索
 data "aws_route53_zone" "existing" {
-  count = var.should_use_existing_zone && var.domain_exists_in_route53 && length(data.external.hosted_zone_selection) > 0 && try(data.external.hosted_zone_selection[0].result.selected_zone_id, null) != null ? 1 : 0
-  zone_id = try(data.external.hosted_zone_selection[0].result.selected_zone_id, null)
-}
-
-# ドメイン登録時のネームサーバー情報を取得
-data "external" "domain_nameservers" {
-  count = var.should_use_existing_zone && var.domain_exists_in_route53 && var.domain_registered ? 1 : 0
-  
-  program = ["bash", "${path.module}/scripts/get_domain_nameservers.sh", "-d", var.domain_name, "-t"]
-  
-  # 環境変数を設定
-  query = {
-    DOMAIN_NAME = var.domain_name
-  }
+  count = var.should_use_existing_zone && var.domain_exists_in_route53 ? 1 : 0
+  name = var.domain_name
 }
 
 # -----------------------------------------------------------------------------
@@ -96,17 +109,12 @@ locals {
   }
   
   # ホストゾーンの決定（既存または新規）
-  # 選択スクリプトの結果または既存のホストゾーンを使用、存在しない場合は新規作成
-  hosted_zone_id = try(data.external.hosted_zone_selection[0].result.selected_zone_id, try(data.aws_route53_zone.existing[0].zone_id, try(aws_route53_zone.main[0].zone_id, "Z04134961ZPYYOPGD0LQY")))
+  # 既存のホストゾーンを使用、存在しない場合は新規作成
+  hosted_zone_id = try(data.aws_route53_zone.existing[0].zone_id, try(aws_route53_zone.main[0].zone_id, null))
   name_servers = try(data.aws_route53_zone.existing[0].name_servers, try(aws_route53_zone.main[0].name_servers, []))
   
-  # 強制再作成フラグ（既存ホストゾーンが存在し、ネームサーバーが不一致の場合）
-  force_recreate_zone = var.should_use_existing_zone && var.domain_exists_in_route53 && var.domain_registered && length(data.external.domain_nameservers) > 0 && try(data.external.domain_nameservers[0].result.error, "") == "" && length(data.aws_route53_zone.existing) > 0 ? (
-    length(setintersection(
-      try(data.aws_route53_zone.existing[0].name_servers, []),
-      jsondecode(data.external.domain_nameservers[0].result.nameservers)
-    )) < 4
-  ) : false
+  # 強制再作成フラグ（簡素化）
+  force_recreate_zone = false
 }
 
 # -----------------------------------------------------------------------------
@@ -195,7 +203,7 @@ resource "aws_iam_role_policy" "route53_query_logging" {
 
 # 新しいホストゾーンの作成（既存ホストゾーンが存在しない場合、または強制再作成の場合）
 resource "aws_route53_zone" "main" {
-  count = (!var.should_use_existing_zone || !var.domain_exists_in_route53 || local.force_recreate_zone) && (length(data.external.hosted_zone_selection) == 0 || try(data.external.hosted_zone_selection[0].result.should_create_new, "false") == "true" || local.force_recreate_zone) ? 1 : 0
+  count = (!var.should_use_existing_zone || !var.domain_exists_in_route53 || local.force_recreate_zone) ? 1 : 0
   
   name = local.normalized_domain_name
   comment = "Hosted zone for ${var.domain_name} managed by Terraform"
@@ -254,20 +262,10 @@ resource "null_resource" "delete_existing_hosted_zone" {
 # -----------------------------------------------------------------------------
 
 # ドメイン登録状況の確認と登録処理
-data "external" "domain_check" {
-  program = ["bash", "${path.module}/scripts/check_and_register_domain.sh", "-d", var.domain_name, "-f", "${path.root}/terraform.tfvars"]
-  
-  # スクリプトが失敗した場合の処理
-  query = {
-    domain_name = var.domain_name
-  }
-}
-
 locals {
   # スクリプトの結果を解析
-  domain_check_result = data.external.domain_check.result
-  should_register_domain = try(local.domain_check_result.register_domain, "false") == "true"
-  domain_unavailable = try(local.domain_check_result.domain_unavailable, "false") == "true"
+  should_register_domain = var.register_domain
+  domain_unavailable = false
 }
 
 # ドメイン登録リソース（条件付き）
@@ -375,7 +373,7 @@ resource "aws_route53_health_check" "main" {
 
 # NSレコード（DelegationSetに基づく設定）
 resource "aws_route53_record" "nameservers" {
-  count = (var.should_use_existing_zone && var.domain_exists_in_route53 && var.domain_registered && length(data.external.domain_nameservers) > 0 && try(data.external.domain_nameservers[0].result.error, "") == "" && !local.force_recreate_zone) || length(aws_route53_zone.main) > 0 ? 1 : 0
+  count = length(aws_route53_zone.main) > 0 ? 1 : 0
   
   zone_id = local.hosted_zone_id
   name    = local.normalized_domain_name

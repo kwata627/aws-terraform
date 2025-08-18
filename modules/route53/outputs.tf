@@ -7,13 +7,13 @@
 # -----------------------------------------------------------------------------
 
 output "zone_id" {
-  description = "Route53ホストゾーンのID（既存または新規）"
-  value       = try(data.external.hosted_zone_selection[0].result.selected_zone_id, try(data.aws_route53_zone.existing[0].zone_id, try(aws_route53_zone.main[0].zone_id, null)))
+  description = "Route53ホストゾーンのID"
+  value       = try(data.aws_route53_zone.existing[0].zone_id, try(aws_route53_zone.main[0].zone_id, null))
 }
 
 output "zone_name" {
   description = "Route53ホストゾーンの名前"
-  value       = local.normalized_domain_name
+  value       = var.domain_name
 }
 
 output "zone_arn" {
@@ -22,8 +22,8 @@ output "zone_arn" {
 }
 
 output "name_servers" {
-  description = "Route53ホストゾーンのネームサーバー（既存または新規）"
-  value       = length(local.name_servers) > 0 ? local.name_servers : null
+  description = "Route53ホストゾーンのネームサーバー"
+  value       = try(data.aws_route53_zone.existing[0].name_servers, try(aws_route53_zone.main[0].name_servers, []))
 }
 
 output "zone_private" {
