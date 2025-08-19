@@ -173,7 +173,7 @@ resource "aws_iam_role_policy" "ssh_rotation" {
 }
 
 # -----------------------------------------------------------------------------
-# SSH Key File Creation (for Ansible)
+# SSH Key File Creation (for Ansible) (Optimized)
 # -----------------------------------------------------------------------------
 
 resource "null_resource" "ssh_key_files" {

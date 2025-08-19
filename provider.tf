@@ -12,14 +12,14 @@
 
 terraform {
   required_version = ">= 1.4.0"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
   }
-  
+
   # バックエンド設定（必要に応じて有効化）
   # backend "s3" {
   #   bucket = "terraform-state-bucket"
@@ -35,7 +35,7 @@ terraform {
 provider "aws" {
   region  = var.aws_region
   profile = var.aws_profile
-  
+
   # デフォルトタグ設定
   default_tags {
     tags = merge(
@@ -48,7 +48,7 @@ provider "aws" {
       var.tags
     )
   }
-  
+
   # 認証情報の設定
   # 注意: 本番環境ではIAMロールまたは環境変数を使用することを推奨
   # access_key = var.aws_access_key
@@ -63,7 +63,7 @@ provider "aws" {
   alias   = "us_east_1"
   region  = "us-east-1"
   profile = var.aws_profile
-  
+
   # デフォルトタグ設定
   default_tags {
     tags = merge(

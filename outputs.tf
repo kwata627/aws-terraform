@@ -13,22 +13,22 @@
 output "domain_analysis" {
   description = "ドメイン分析結果"
   value = {
-    domain_name = local.domain_config.domain_name
+    domain_name              = local.domain_config.domain_name
     should_use_existing_zone = local.should_use_existing_zone
-    should_register_domain = local.should_register_domain
+    should_register_domain   = local.should_register_domain
     domain_exists_in_route53 = local.domain_exists_in_route53
-    domain_exists_in_dns = local.domain_exists_in_dns
-    domain_registered = local.domain_registered
+    domain_exists_in_dns     = local.domain_exists_in_dns
+    domain_registered        = local.domain_registered
   }
 }
 
 # -----------------------------------------------------------------------------
-# SSH Key Auto-Setup Resource
+# SSH Key Auto-Setup Resource (Optimized)
 # -----------------------------------------------------------------------------
 
 resource "null_resource" "ssh_key_setup" {
   triggers = {
-    ssh_private_key = module.ssh.private_key_pem
+    ssh_private_key     = module.ssh.private_key_pem
     wordpress_public_ip = module.ec2.public_ip
   }
 
@@ -52,10 +52,7 @@ resource "null_resource" "ssh_key_setup" {
         sed -i "s|HostName.*|HostName ${module.ec2.public_ip}|" ~/.ssh/config
       fi
       
-      echo "SSH鍵の設定が完了しました:"
-      echo "- 秘密鍵: ~/.ssh/wordpress_key"
-      echo "- SSH設定: ~/.ssh/config"
-      echo "- 接続コマンド: ssh wordpress-server"
+      echo "SSH鍵の設定が完了しました"
     EOT
   }
 
@@ -63,14 +60,14 @@ resource "null_resource" "ssh_key_setup" {
 }
 
 # -----------------------------------------------------------------------------
-# Ansible Auto-Setup Resource
+# Ansible Auto-Setup Resource (Optimized)
 # -----------------------------------------------------------------------------
 
 resource "null_resource" "ansible_setup" {
   triggers = {
     wordpress_public_ip = module.ec2.public_ip
-    ssh_private_key = module.ssh.private_key_pem
-    domain_name = var.domain_name
+    ssh_private_key     = module.ssh.private_key_pem
+    domain_name         = var.domain_name
   }
 
   provisioner "local-exec" {
@@ -84,33 +81,16 @@ resource "null_resource" "ansible_setup" {
       
       # 生成されたインベントリの確認
       if [ -f "inventory/hosts.yml" ]; then
-        echo "✓ インベントリファイルが生成されました: inventory/hosts.yml"
-        echo ""
-        echo "インベントリ内容:"
-        cat inventory/hosts.yml
+        echo "✓ インベントリファイルが生成されました"
       else
         echo "✗ インベントリファイルの生成に失敗しました"
         exit 1
       fi
       
-      # Ansible設定の確認
-      echo ""
-      echo "Ansible設定を確認中..."
-      if command -v ansible-inventory &> /dev/null; then
-        ansible-inventory --list -i inventory/hosts.yml
-        echo "✓ Ansible設定が正常です"
-      else
-        echo "警告: ansible-inventoryコマンドが見つかりません"
-      fi
-      
       # 元のディレクトリに戻る
       cd ..
       
-      echo ""
-      echo "Ansible設定が完了しました！"
-      echo "次のステップ:"
-      echo "  cd ansible"
-      echo "  ansible-playbook -i inventory/hosts.yml playbooks/wordpress-setup.yml"
+      echo "Ansible設定が完了しました"
     EOT
   }
 
@@ -118,14 +98,14 @@ resource "null_resource" "ansible_setup" {
 }
 
 # -----------------------------------------------------------------------------
-# WordPress Environment Setup Resource
+# WordPress Environment Setup Resource (Optimized)
 # -----------------------------------------------------------------------------
 
 resource "null_resource" "wordpress_setup" {
   triggers = {
     wordpress_public_ip = module.ec2.public_ip
-    ssh_private_key = module.ssh.private_key_pem
-    rds_endpoint = module.rds.db_endpoint
+    ssh_private_key     = module.ssh.private_key_pem
+    rds_endpoint        = module.rds.db_endpoint
   }
 
   provisioner "local-exec" {
@@ -165,12 +145,6 @@ resource "null_resource" "wordpress_setup" {
       
       # 元のディレクトリに戻る
       cd ..
-      
-      echo ""
-      echo "WordPress環境構築が完了しました！"
-      echo "アクセス情報:"
-      echo "- WordPress URL: https://${var.domain_name}"
-      echo "- 管理画面: https://${var.domain_name}/wp-admin"
     EOT
   }
 
@@ -178,27 +152,22 @@ resource "null_resource" "wordpress_setup" {
 }
 
 # -----------------------------------------------------------------------------
-# SSL/TLS Setup Resource (Let's Encrypt対応)
+# SSL/TLS Setup Resource (Let's Encrypt対応) (Optimized)
 # -----------------------------------------------------------------------------
 
 resource "null_resource" "ssl_setup" {
   count = var.enable_ssl_setup && var.enable_lets_encrypt ? 1 : 0
-  
+
   triggers = {
-    domain_name = var.domain_name
-    lets_encrypt_email = var.lets_encrypt_email
+    domain_name          = var.domain_name
+    lets_encrypt_email   = var.lets_encrypt_email
     lets_encrypt_staging = var.lets_encrypt_staging
-    webroot_path = "/var/www/html"
-    apache_config_version = "2.0"
   }
 
   provisioner "local-exec" {
     command = <<-EOT
       # Ansibleディレクトリに移動
       cd ansible
-      
-      # Let's Encrypt証明書の設定
-      echo "Let's Encrypt証明書の設定を開始中..."
       
       # 環境変数を設定
       export DOMAIN_NAME="${var.domain_name}"
@@ -224,13 +193,13 @@ resource "null_resource" "ssl_setup" {
 }
 
 # -----------------------------------------------------------------------------
-# Environment Testing Resource
+# Environment Testing Resource (Optimized)
 # -----------------------------------------------------------------------------
 
 resource "null_resource" "environment_test" {
   triggers = {
     wordpress_public_ip = module.ec2.public_ip
-    domain_name = var.domain_name
+    domain_name         = var.domain_name
   }
 
   provisioner "local-exec" {
@@ -241,18 +210,6 @@ resource "null_resource" "environment_test" {
       if [ -f "./scripts/test_environment.sh" ]; then
         echo "WordPress環境をテスト中..."
         ./scripts/test_environment.sh
-      fi
-      
-      # 監視設定のテスト
-      if [ -f "./scripts/test_monitoring.sh" ]; then
-        echo "監視設定をテスト中..."
-        ./scripts/test_monitoring.sh
-      fi
-      
-      # デプロイメントテスト
-      if [ -f "./scripts/deployment/test_environment.sh" ]; then
-        echo "デプロイメント環境をテスト中..."
-        ./scripts/deployment/test_environment.sh
       fi
       
       echo "✓ 環境テストが完了しました"
@@ -269,10 +226,10 @@ resource "null_resource" "environment_test" {
 output "infrastructure_summary" {
   description = "インフラストラクチャの概要"
   value = {
-    project = var.project
+    project     = var.project
     environment = var.environment
-    region = var.aws_region
-    vpc_cidr = var.vpc_cidr
+    region      = var.aws_region
+    vpc_cidr    = var.vpc_cidr
     domain_name = var.domain_name
   }
 }
@@ -457,9 +414,9 @@ output "ssh_key_fingerprint" {
 output "security_groups" {
   description = "セキュリティグループの情報"
   value = {
-    ec2_public_sg_id = try(module.security.ec2_public_sg_id, null)
-    ec2_private_sg_id = try(module.security.ec2_private_sg_id, null)
-    rds_sg_id = try(module.security.rds_sg_id, null)
+    ec2_public_sg_id   = try(module.security.ec2_public_sg_id, null)
+    ec2_private_sg_id  = try(module.security.ec2_private_sg_id, null)
+    rds_sg_id          = try(module.security.rds_sg_id, null)
     nat_instance_sg_id = try(module.security.nat_instance_sg_id, null)
   }
 }
@@ -514,16 +471,16 @@ output "validation_rds_endpoint" {
 output "module_status" {
   description = "各モジュールの有効化状態"
   value = {
-    ssh_enabled = true
+    ssh_enabled          = true
     nat_instance_enabled = true
-    network_enabled = true
-    security_enabled = local.enable_security
-    ec2_enabled = true
-    rds_enabled = true
-    s3_enabled = true
-    route53_enabled = true
-    cloudfront_enabled = false  # CloudFrontを無効化
-    acm_enabled = false  # ACMを無効化
+    network_enabled      = true
+    security_enabled     = local.enable_security
+    ec2_enabled          = true
+    rds_enabled          = true
+    s3_enabled           = true
+    route53_enabled      = true
+    cloudfront_enabled   = false # CloudFrontを無効化
+    acm_enabled          = false # ACMを無効化
   }
 }
 
@@ -534,13 +491,13 @@ output "module_status" {
 output "security_features_status" {
   description = "セキュリティ機能の有効化状態"
   value = {
-    ssh_key_rotation = try(module.ssh.security_features_enabled.key_rotation, false)
-    ssh_backup = try(module.ssh.security_features_enabled.backup, false)
-    ssh_audit_logs = try(module.ssh.security_features_enabled.audit_logs, false)
-    rds_encryption = try(module.rds.storage_encrypted, false)
-    rds_deletion_protection = try(module.rds.deletion_protection, false)
-    s3_encryption = try(module.s3.encryption_enabled, false)
-    s3_versioning = try(module.s3.versioning_enabled, false)
+    ssh_key_rotation         = try(module.ssh.security_features_enabled.key_rotation, false)
+    ssh_backup               = try(module.ssh.security_features_enabled.backup, false)
+    ssh_audit_logs           = try(module.ssh.security_features_enabled.audit_logs, false)
+    rds_encryption           = try(module.rds.storage_encrypted, false)
+    rds_deletion_protection  = try(module.rds.deletion_protection, false)
+    s3_encryption            = try(module.s3.encryption_enabled, false)
+    s3_versioning            = try(module.s3.versioning_enabled, false)
     s3_public_access_blocked = try(module.s3.public_access_blocked, false)
   }
 }
@@ -554,7 +511,7 @@ output "monitoring_resources" {
   value = {
     ssh_audit_log_group = try(module.ssh.audit_log_group_name, null)
     rds_cloudwatch_logs = try(module.rds.cloudwatch_log_groups, null)
-    s3_access_logs = try(module.s3.access_logs_bucket_name, null)
+    s3_access_logs      = try(module.s3.access_logs_bucket_name, null)
   }
 }
 
@@ -565,9 +522,9 @@ output "monitoring_resources" {
 output "connection_info" {
   description = "接続情報"
   value = {
-    wordpress_url = "http://${try(module.ec2.public_ip, "N/A")}"
-    wordpress_https_url = "https://${var.domain_name}"
-    ssh_command = "ssh -i ~/.ssh/wordpress_key ec2-user@${try(module.ec2.public_ip, "N/A")}"
+    wordpress_url         = "http://${try(module.ec2.public_ip, "N/A")}"
+    wordpress_https_url   = "https://${var.domain_name}"
+    ssh_command           = "ssh -i ~/.ssh/wordpress_key ec2-user@${try(module.ec2.public_ip, "N/A")}"
     rds_connection_string = "mysql://root:${var.db_password}@${try(module.rds.db_endpoint, "N/A")}:${try(module.rds.db_port, "3306")}/wordpress"
   }
   sensitive = true

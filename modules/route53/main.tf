@@ -234,24 +234,7 @@ resource "null_resource" "delete_existing_hosted_zone" {
   count = local.force_recreate_zone && length(data.aws_route53_zone.existing) > 0 ? 1 : 0
   
   provisioner "local-exec" {
-    command = <<-EOT
-      echo "既存ホストゾーンを削除中: ${data.aws_route53_zone.existing[0].zone_id}"
-      
-      # すべてのレコードを削除
-      aws route53 list-resource-record-sets --hosted-zone-id ${data.aws_route53_zone.existing[0].zone_id} --query 'ResourceRecordSets[?Type!=`NS` && Type!=`SOA`].{Name:Name,Type:Type,TTL:TTL,ResourceRecords:ResourceRecords}' --output json | \
-      jq -r '.[] | "aws route53 change-resource-record-sets --hosted-zone-id ${data.aws_route53_zone.existing[0].zone_id} --change-batch '\''{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":{\"Name\":\"'$Name'\",\"Type\":\"'$Type'\",\"TTL\":'$TTL',\"ResourceRecords\":'$ResourceRecords'}}]}'\''"' | \
-      while read cmd; do
-        if [ -n "$cmd" ]; then
-          echo "実行: $cmd"
-          eval "$cmd"
-        fi
-      done
-      
-      # ホストゾーンを削除
-      aws route53 delete-hosted-zone --id ${data.aws_route53_zone.existing[0].zone_id}
-      
-      echo "既存ホストゾーンの削除が完了しました"
-    EOT
+    command = "echo '既存ホストゾーンの削除が必要ですが、手動で実行してください: aws route53 delete-hosted-zone --id ${data.aws_route53_zone.existing[0].zone_id}'"
   }
   
   depends_on = [aws_route53_zone.main]
